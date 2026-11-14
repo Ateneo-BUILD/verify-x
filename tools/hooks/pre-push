@@ -1,0 +1,17 @@
+#!/bin/sh
+# Refuse a push that would publish a secret. The work is in check_push.py;
+# this wrapper only finds a Python 3 to run it with.
+#
+# Enable once per clone:   git config core.hooksPath tools/hooks
+#
+# Fails CLOSED: with no Python to run the check, the push is refused rather
+# than waved through unchecked.
+here=$(dirname "$0")
+for py in python3 python py; do
+    if command -v "$py" >/dev/null 2>&1 &&
+       "$py" -c 'import sys; sys.exit(sys.version_info < (3, 8))' >/dev/null 2>&1; then
+        exec "$py" "$here/check_push.py" "$@"
+    fi
+done
+echo "pre-push: no Python 3 found, so the secret check could not run; refusing." >&2
+exit 1

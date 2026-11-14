@@ -1,0 +1,16 @@
+{% comment %}
+The location this session's transactions are logged against, with a way back
+to the chooser. Hidden when the operator has only one possible context —
+there is nothing to change, and the strip would be pure noise.
+{% endcomment %}
+{% if current_org and can_switch_context %}
+<div class="context-strip">
+    <span>{{ verb|default:"Working at" }}
+        <b>{% if current_location_name %}{{ current_location_name }}{% else %}no location set{% endif %}</b>
+    </span>
+    <form method="post" action="{% url 'switch_context' %}" class="inline-form">
+        {% csrf_token %}
+        <button type="submit" class="link-button">Change</button>
+    </form>
+</div>
+{% endif %}

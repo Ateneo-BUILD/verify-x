@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% comment %}
+Where the operator says who they are working for. Reached after every
+sign-in, but only *rendered* when the answer is not already determined —
+_require_context() resolves a single-organization, single-location operator
+without showing them anything.
+{% endcomment %}
+
+{% block title %}{{ site_title }}: Select Organization{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* These rows are <button>s inside a .card, so base.html's
+       ".container button, .card button" rule applies to them -- primary
+       blue, white text, centred, no border. Every declaration here has to
+       out-specify that (0,1,1), which is why the selectors are
+       ".container button.pick" and not ".pick". Written as ".pick" the
+       unselected rows render as solid blue primary buttons, and the
+       selected row inherits `color: white` while its own `background`
+       wins: white on #f5f9fd, a contrast ratio of 1.06:1. */
+    .container button.pick {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.75rem;
+        width: 100%;
+        text-align: left;
+        padding: 0.7rem 0.85rem;
+        margin: 0 0 0.5rem;
+        border: 1.5px solid var(--border-color);
+        border-radius: 6px;
+        background-color: #fff;
+        color: var(--text-color);
+        font: inherit;
+        cursor: pointer;
+        transition: background-color 0.15s, border-color 0.15s;
+    }
+    .container button.pick:hover {
+        background-color: #f4f7fa;
+        border-color: #b9c6d4;
+    }
+    .container button.pick.selected {
+        border-color: var(--primary-color);
+        background-color: #eef4fa;
+        color: var(--secondary-color);   /* 10.6:1 on the tint */
+        box-shadow: 0 0 0 2px rgba(0, 82, 155, 0.15);
+    }
+    .container button.pick:focus-visible {
+        outline: 2px solid var(--primary-color);
+        outline-offset: 2px;
+    }
+    .pick .pick-id { flex: 1; min-width: 0; }
+    .pick .pick-name { display: block; font-weight: 600; font-size: 0.95rem; }
+    .pick .pick-meta {
+        display: block; font-weight: 400; font-size: 0.78rem;
+        color: #5c6672; margin-top: 0.1rem;      /* 5.8:1 on white */
+    }
+    .container button.pick.selected .pick-meta { color: #40566e; }  /* 6.8:1 on the tint */
+    /* The chip would otherwise sit on a background almost its own colour. */
+    .container button.pick.selected .role-badge {
+        box-shadow: inset 0 0 0 1px rgba(0, 56, 106, 0.18);
+    }
+    .pick img.org-logo { max-height: 40px; max-width: 90px; width: auto; border-radius: 4px; }
+    .pick .radio {
+        width: 18px; height: 18px; border-radius: 50%;
+        border: 2px solid #8a97a5; flex: 0 0 auto; position: relative;
+    }
+    .container button.pick.selected .radio { border-color: var(--primary-color); }
+    .container button.pick.selected .radio::after {
+        content: ""; position: absolute; inset: 3px;
+        border-radius: 50%; background: var(--primary-color);
+    }
+    .loc-group[hidden] { display: none; }
+    .signed-in { text-align: center; font-size: 0.8rem; color: #666; }
+    .signed-in a { color: var(--primary-color); font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container container--narrow">
+
+    <div class="branding-header">
+        <img src="{% static 'nationalid-everify-logo.png' %}" alt="National ID eVerify">
+    </div>
+
+    {% if not organizations %}
+        <h1>No organization yet</h1>
+        <div class="card" style="max-width:560px; margin:0 auto;">
+            {% if is_site_admin %}
+                {% comment %}
+                The bootstrap path: without this a site admin on a fresh site
+                would have nowhere to go, since creating the first organization
+                is the only thing that can end this state.
+                {% endcomment %}
+                <p style="font-size:0.9rem; color:#555; margin-top:0;">
+                    There are no active organizations on this site yet. Create one to
+                    get started &mdash; you can add its people, locations and eVerify
+                    credentials straight afterwards.
+                </p>
+                <button type="button" data-href="{% url 'site_admin' %}">
+                    Go to Site Administration
+                </button>
+            {% else %}
+                <p style="font-size:0.9rem; color:#555; margin-top:0;">
+                    Your National ID was verified, but you have not been added to any
+                    organization on this site. An administrator has to add you before
+                    you can verify anyone.
+                </p>
+                <p class="hint">
+                    If you have just been added, sign out and sign in again.
+                </p>
+            {% endif %}
+            <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn-secondary">Sign out</button>
+            </form>
+        </div>
+    {% else %}
+        <h1>Select your organization</h1>
+
+        {% if error %}<div class="status-box error" style="margin-bottom:1rem;">{{ error }}</div>{% endif %}
+
+        <form method="post" action="{% url 'choose' %}" id="choose-form">
+            {% csrf_token %}
+            <input type="hidden" name="organization" id="organization-input" value="{{ selected.id }}">
+            <input type="hidden" name="location" id="location-input" value="">
+
+            <div class="card">
+                <h2>Organization</h2>
+                {% for row in organizations %}
+                <button type="button" class="pick org-pick{% if row.selected %} selected{% endif %}"
+                        data-org="{{ row.org.id }}"
+                        data-location="{% if row.selected_location %}{{ row.selected_location }}{% endif %}"
+                        aria-pressed="{% if row.selected %}true{% else %}false{% endif %}">
+                    {% if row.org.logo_data %}
+                        <img class="org-logo" src="{{ row.org.logo_data }}" alt="">
+                    {% else %}
+                        <span class="org-mark" style="background:{{ row.org.mark_color }};">{{ row.org.initials }}</span>
+                    {% endif %}
+                    <span class="pick-id">
+                        <span class="pick-name">{{ row.org.name }}</span>
+                        <span class="pick-meta">
+                            {{ row.location_count }} location{{ row.location_count|pluralize }}
+                            &middot; {{ row.type_count }} transaction type{{ row.type_count|pluralize }}
+                            {% if row.guest %}&middot; site admin access{% endif %}
+                        </span>
+                    </span>
+                    <span class="role-badge {% if row.is_admin %}role-admin{% else %}role-operator{% endif %}">{{ row.role }}</span>
+                </button>
+                {% endfor %}
+            </div>
+
+            {% for row in organizations %}
+            <div class="card loc-group" data-org="{{ row.org.id }}" {% if not row.selected %}hidden{% endif %}>
+                <h2>Location</h2>
+                {% if row.locations %}
+                    {% for loc in row.locations %}
+                    <button type="button" class="pick loc-pick{% if loc.id == row.selected_location %} selected{% endif %}"
+                            data-location="{{ loc.id }}"
+                            aria-pressed="{% if loc.id == row.selected_location %}true{% else %}false{% endif %}">
+                        <span class="radio"></span>
+                        <span class="pick-id"><span class="pick-name">{{ loc.name }}</span></span>
+                    </button>
+                    {% endfor %}
+                {% else %}
+                    <div class="info-box" style="margin-bottom:0.5rem;">
+                        {{ row.org.name }} has no locations yet. Transactions will be
+                        logged without one until an administrator adds some.
+                    </div>
+                {% endif %}
+                <button type="submit" style="margin-top:0.85rem;">Continue</button>
+            </div>
+            {% endfor %}
+        </form>
+
+        {% comment %}
+        The same badge the nav corner carries once a context is chosen:
+        session_display_name from org_context(), which is the short name
+        masked under the operator's own Demo Mode. Given and last names
+        printed separately would be the one spelling mask_name cannot
+        redact (it keeps the first word of each).
+        {% endcomment %}
+        <div class="signed-in">
+            Signed in as {{ session_display_name }} &middot;
+            <form method="post" action="{% url 'logout' %}" class="inline-form">
+                {% csrf_token %}
+                <button type="submit" class="link-button">Sign out</button>
+            </form>
+        </div>
+    {% endif %}
+
+    {% include "includes/branding_footer.html" %}
+</div>
+
+<script nonce="{{ csp_nonce }}">
+(function() {
+    var form = document.getElementById('choose-form');
+    if (!form) { return; }
+
+    var orgInput = document.getElementById('organization-input');
+    var locInput = document.getElementById('location-input');
+    var orgPicks = form.querySelectorAll('.org-pick');
+    var locGroups = form.querySelectorAll('.loc-group');
+
+    function selectLocation(group, locationId) {
+        var chosen = '';
+        group.querySelectorAll('.loc-pick').forEach(function(pick) {
+            var isMatch = pick.getAttribute('data-location') === String(locationId);
+            pick.classList.toggle('selected', isMatch);
+            pick.setAttribute('aria-pressed', isMatch ? 'true' : 'false');
+            if (isMatch) { chosen = pick.getAttribute('data-location'); }
+        });
+        locInput.value = chosen;
+    }
+
+    function selectOrg(orgId) {
+        orgInput.value = orgId;
+        orgPicks.forEach(function(pick) {
+            var isMatch = pick.getAttribute('data-org') === String(orgId);
+            pick.classList.toggle('selected', isMatch);
+            pick.setAttribute('aria-pressed', isMatch ? 'true' : 'false');
+        });
+        locGroups.forEach(function(group) {
+            var isMatch = group.getAttribute('data-org') === String(orgId);
+            group.hidden = !isMatch;
+            if (isMatch) {
+                var pick = form.querySelector('.org-pick[data-org="' + orgId + '"]');
+                selectLocation(group, pick ? pick.getAttribute('data-location') : '');
+            }
+        });
+    }
+
+    orgPicks.forEach(function(pick) {
+        pick.addEventListener('click', function() {
+            selectOrg(this.getAttribute('data-org'));
+        });
+    });
+
+    locGroups.forEach(function(group) {
+        group.querySelectorAll('.loc-pick').forEach(function(pick) {
+            pick.addEventListener('click', function() {
+                // Remember the choice on the org button so switching away and
+                // back does not silently reset it.
+                var orgId = group.getAttribute('data-org');
+                var orgPick = form.querySelector('.org-pick[data-org="' + orgId + '"]');
+                if (orgPick) { orgPick.setAttribute('data-location', this.getAttribute('data-location')); }
+                selectLocation(group, this.getAttribute('data-location'));
+            });
+        });
+    });
+
+    selectOrg(orgInput.value);
+})();
+</script>
+{% endblock %}

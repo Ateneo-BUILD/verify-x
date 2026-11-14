@@ -1,0 +1,7 @@
+{% comment %}
+How far a published key is from being allowed to {{ verb }} ("switch" on
+Setup, "start" on an organization's page). `gate` is a row's gate from
+accounts/signing_status.py: the signer's own answer (registry.activation_gate),
+with the phones whose app cannot follow a certified deployment key and
+whether its count can be trusted yet.
+{% endcomment %}{% if gate.not_capable %}{{ gate.not_capable }} phone{{ gate.not_capable|pluralize }} that synced within a lease run{{ gate.not_capable|pluralize:"s," }} an app that cannot follow this key{% if gate.phones %}: {{ gate.phones|join:", " }}{% endif %}. Update {{ gate.not_capable|pluralize:"it,them" }}, or unpair {{ gate.not_capable|pluralize:"it,them" }} and wait out {{ gate.not_capable|pluralize:"its,their" }} last lease.{% elif gate.open %}{% if gate.counted and not gate.of %}No phone has synced within a lease, so it may {{ verb }} now.{% elif gate.counted and gate.have == gate.of %}All {{ gate.of }} phone{{ gate.of|pluralize }} that synced within a lease {{ gate.of|pluralize:"has,have" }} it, so it may {{ verb }} now.{% else %}It was published a lease ago, so it may {{ verb }} now.{% endif %}{% elif not gate.counted %}The signer has signed bundles for under a lease, so it cannot yet tell which phones have this key. It may {{ verb }} on {{ gate.opens_at|date:"j M Y" }}.{% else %}{{ gate.have }} of {{ gate.of }} phones that synced within a lease have it. It may {{ verb }} once all do, or on {{ gate.opens_at|date:"j M Y" }}.{% endif %}

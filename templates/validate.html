@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ site_title }}: Validate{% endblock %}
+
+{% block extra_head %}
+<script src="{% static 'jsQR.min.js' %}?v={{ APP_VERSION }}"></script>
+<style>
+
+    .scan-area {
+        text-align: center;
+        padding: 2rem 1rem;
+    }
+    .scan-area p {
+        color: #666;
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+    .container button.btn-scan {
+        width: auto;
+        padding: 0.65rem 1.5rem;
+        font-size: 1rem;
+        margin: 0 auto;
+    }
+    .container button.btn-cancel {
+        background-color: #6c757d;
+        width: auto;
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+    }
+    .container button.btn-cancel:hover { background-color: #5a6268; }
+
+    #camera-container {
+        display: none;
+        position: relative;
+        max-width: 500px;
+        margin: 1rem auto;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #000;
+    }
+    #camera-container video { width: 100%; display: block; }
+    .camera-overlay-text {
+        position: absolute; bottom: 0.75rem; left: 0; right: 0;
+        text-align: center; font-size: 0.85rem; color: #fff;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    }
+    #scan-timer {
+        text-align: center;
+        font-size: 0.8rem;
+        color: #999;
+        margin-top: 0.5rem;
+    }
+
+    .result-card {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+    .result-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .result-table th,
+    .result-table td {
+        border: 1px solid var(--border-color);
+        padding: 0.5rem 0.75rem;
+        text-align: left;
+        font-size: 0.9rem;
+    }
+    .result-table th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+        color: var(--secondary-color);
+        width: 35%;
+    }
+
+    .not-found {
+        text-align: center;
+        padding: 2rem;
+        color: var(--error-color);
+        font-weight: 600;
+        font-size: 1rem;
+    }
+    .found-header {
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    .found-header .badge-valid {
+        display: inline-block;
+        padding: 0.3rem 1rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        background: #e9f7ec;
+        color: #28a745;
+        border: 1px solid #28a745;
+    }
+    .found-header .badge-invalid {
+        display: inline-block;
+        padding: 0.3rem 1rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        background: #fdecea;
+        color: #dc3545;
+        border: 1px solid #dc3545;
+    }
+    .uuid-display {
+        font-family: monospace;
+        font-size: 0.75rem;
+        color: #999;
+        text-align: center;
+        margin-top: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container container--narrow">
+    {% csrf_token %}
+    {% include "includes/app_nav.html" with active_nav="validate" %}
+    {% include "includes/org_banner.html" %}
+
+    <div class="card">
+        <h2>Validate Transaction</h2>
+
+        {% if prefill %}
+        {{ prefill|json_script:"validate-prefill" }}
+        <div class="info-box" style="margin-bottom:1rem;">
+            <strong>This is a sample, not a validation.</strong>
+            The record below was filled in by
+            <code>/debug-sample/validate/</code> from {{ prefill_source }} and
+            was never logged &mdash; its transaction ID resolves to nothing,
+            here or anywhere. Scanning a real QR replaces it.
+        </div>
+        {% endif %}
+
+        <!-- Scan Area -->
+        <div id="scan-area" class="scan-area">
+            <p>Scan the QR on a verification document, or the credential
+               square on its cut-out card, to validate the record.</p>
+            <button class="btn-scan" id="btn-start-scan">Scan QR Code</button>
+        </div>
+
+        <!-- Camera -->
+        <div id="camera-container">
+            <video id="scan-video" playsinline></video>
+            <div class="camera-overlay-text">Point camera at the document or card QR...</div>
+        </div>
+        <div id="scan-timer"></div>
+        <div style="text-align:center;">
+            <button class="btn-cancel" id="btn-cancel-scan" style="display:none;">Cancel</button>
+        </div>
+        <canvas id="scan-canvas" style="display:none;"></canvas>
+
+        <!-- Status -->
+        <div id="scan-status" style="text-align:center; margin-top:1rem;"></div>
+
+        <!-- Result -->
+        <div id="result-area" style="display:none;">
+        </div>
+    </div>
+
+    {% include "includes/branding_footer.html" %}
+</div>
+
+<script nonce="{{ csp_nonce }}">
+(function() {
+    var UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    var TIMEOUT_SECONDS = 30;
+
+    /* What the printed document actually carries.
+
+       A document with a credential draws `<UUID>:CL03:<credential>` -- the
+       transaction id first, so a plain camera still reads the id it always
+       did, which is the whole reason the credential was appended rather than
+       substituted. The bare UUID is only what a document with NO credential
+       draws, so a pattern anchored at both ends would ignore every card that
+       carries a credential, silently, for the full thirty seconds: a camera
+       that simply never finds anything.
+
+       Split on the separator rather than matching a prefix loosely: the id is
+       exactly what precedes the first `:CL03:`, and it still has to look like
+       a UUID before it is sent anywhere. The first, because the credential's
+       Base45 can spell the marker by chance. */
+    var CREDENTIAL_SEPARATOR = ':CL03:';
+    /* CL03F1 carries the face as WebP, CL03F2 as AVIF; either is the face square. */
+    var PORTRAIT_PREFIXES = ['CL03F1:', 'CL03F2:'];
+
+    function transactionIdFrom(data) {
+        var text = (data || '').trim();
+        if (UUID_PATTERN.test(text)) { return text; }
+        var at = text.indexOf(CREDENTIAL_SEPARATOR);
+        if (at >= 0 && UUID_PATTERN.test(text.slice(0, at))) {
+            return text.slice(0, at);
+        }
+        return '';
+    }
+
+    /* The card carries TWO symbols and they are the same size, so the wrong
+       one is an easy thing to point a camera at. The face symbol names the
+       credential, not the transaction, so there is nothing here to look up --
+       say which square to use instead of going on looking like a camera that
+       cannot read. */
+    function isFaceSymbol(data) {
+        var text = (data || '').trim();
+        return PORTRAIT_PREFIXES.some(function (prefix) {
+            return text.indexOf(prefix) === 0;
+        });
+    }
+
+    var btnStartScan = document.getElementById('btn-start-scan');
+    var btnCancelScan = document.getElementById('btn-cancel-scan');
+    var cameraContainer = document.getElementById('camera-container');
+    var video = document.getElementById('scan-video');
+    var canvas = document.getElementById('scan-canvas');
+    var ctx = canvas.getContext('2d');
+    var scanArea = document.getElementById('scan-area');
+    var scanTimer = document.getElementById('scan-timer');
+    var scanStatus = document.getElementById('scan-status');
+    var resultArea = document.getElementById('result-area');
+
+    var stream = null;
+    var scanInterval = null;
+    var countdownInterval = null;
+    var secondsLeft = 0;
+
+    function stopCamera() {
+        if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+        if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+        if (stream) {
+            stream.getTracks().forEach(function(t) { t.stop(); });
+            stream = null;
+        }
+        video.srcObject = null;
+        cameraContainer.style.display = 'none';
+        btnCancelScan.style.display = 'none';
+        scanTimer.textContent = '';
+    }
+
+    function showStatus(msg, isError) {
+        scanStatus.innerHTML = '<div style="padding:0.5rem; border-radius:4px; font-size:0.85rem; ' +
+            (isError ? 'background:#fdecea; color:#dc3545; border:1px solid #dc3545;' : 'background:#e9f7ec; color:#28a745; border:1px solid #28a745;') +
+            '">' + msg + '</div>';
+    }
+
+    // ONE renderer. The scan feeds it from /api/validate/, and the
+    // development sample page feeds it a record that was never logged --
+    // which is why the API is not taught to answer for that record. Two
+    // renderers would let the sample show a page nobody actually gets.
+    function renderTransaction(t, uuid) {
+        var isSuccess = t.authentication_result === 'success';
+
+        var fields = [
+            ['Authentication Result', t.authentication_result],
+            ['Transaction Type', t.transaction_type],
+            ['Verification Timestamp', t.verification_timestamp],
+            ['Given Name', t.given_name],
+            ['Middle Name', t.middle_name],
+            ['Last Name', t.last_name],
+            ['National ID Card Number', t.national_id_card_number],
+            ['Digital National ID', t.digital_national_id_number],
+            ['Operator', t.operator_name],
+            ['Location', t.operator_location],
+        ];
+
+        var card = document.createElement('div');
+        card.className = 'result-card';
+
+        var header = document.createElement('div');
+        header.className = 'found-header';
+        var badge = document.createElement('span');
+        badge.className = isSuccess ? 'badge-valid' : 'badge-invalid';
+        badge.textContent = isSuccess ? 'Verified' : 'Not Verified';
+        header.appendChild(badge);
+        card.appendChild(header);
+
+        var table = document.createElement('table');
+        table.className = 'result-table';
+        fields.forEach(function(f) {
+            var tr = document.createElement('tr');
+            var th = document.createElement('th'); th.textContent = f[0];
+            var td = document.createElement('td'); td.textContent = f[1] || '';
+            tr.appendChild(th); tr.appendChild(td);
+            table.appendChild(tr);
+        });
+        // Transaction ID row
+        var trId = document.createElement('tr');
+        var thId = document.createElement('th'); thId.textContent = 'Transaction ID';
+        var tdId = document.createElement('td'); tdId.textContent = uuid;
+        tdId.style.fontFamily = 'monospace'; tdId.style.fontSize = '0.8rem';
+        trId.appendChild(thId); trId.appendChild(tdId);
+        table.appendChild(trId);
+
+        card.appendChild(table);
+        resultArea.innerHTML = '';
+        resultArea.appendChild(card);
+        resultArea.style.display = 'block';
+    }
+
+    function lookupTransaction(uuid) {
+        showStatus('Looking up transaction...', false);
+        fetch('/api/validate/' + uuid + '/')
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                scanStatus.innerHTML = '';
+                if (resp.status === 'found') {
+                    renderTransaction(resp.transaction, uuid);
+                } else {
+                    var nf = document.createElement('div');
+                    nf.className = 'not-found';
+                    nf.textContent = 'Transaction not found for ID: ' + uuid;
+                    resultArea.innerHTML = '';
+                    resultArea.appendChild(nf);
+                    resultArea.style.display = 'block';
+                }
+                // Show scan button again
+                btnStartScan.textContent = 'Scan Another';
+                btnStartScan.style.display = '';
+            })
+            .catch(function() {
+                showStatus('Network error looking up transaction.', true);
+                btnStartScan.style.display = '';
+            });
+    }
+
+    function scanFrame() {
+        if (!video.videoWidth) return;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+        if (code && code.data) {
+            var data = code.data.trim();
+            var transactionId = transactionIdFrom(data);
+            if (transactionId) {
+                stopCamera();
+                btnStartScan.style.display = 'none';
+                lookupTransaction(transactionId);
+                return;
+            }
+            if (isFaceSymbol(data)) {
+                // Keep looking: the other square is a few centimetres away,
+                // and the message is a fixed string of ours -- nothing
+                // scanned is ever put on the page as markup.
+                showStatus('That is the photo symbol. Scan the other square '
+                           + 'on the card, or the QR on the document itself.',
+                           true);
+            }
+        }
+    }
+
+    btnStartScan.addEventListener('click', function() {
+        resultArea.style.display = 'none';
+        resultArea.innerHTML = '';
+        scanStatus.innerHTML = '';
+        btnStartScan.style.display = 'none';
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            .then(function(s) {
+                stream = s;
+                video.srcObject = s;
+                video.play();
+                cameraContainer.style.display = 'block';
+                btnCancelScan.style.display = '';
+
+                // Start scanning
+                scanInterval = setInterval(scanFrame, 300);
+
+                // Countdown
+                secondsLeft = TIMEOUT_SECONDS;
+                scanTimer.textContent = secondsLeft + 's remaining';
+                countdownInterval = setInterval(function() {
+                    secondsLeft--;
+                    scanTimer.textContent = secondsLeft + 's remaining';
+                    if (secondsLeft <= 0) {
+                        stopCamera();
+                        showStatus('Scan timed out. No QR code detected.', true);
+                        btnStartScan.textContent = 'Try Again';
+                        btnStartScan.style.display = '';
+                    }
+                }, 1000);
+            })
+            .catch(function(err) {
+                showStatus('Camera access denied: ' + err.message, true);
+                btnStartScan.style.display = '';
+            });
+    });
+
+    btnCancelScan.addEventListener('click', function() {
+        stopCamera();
+        showStatus('Scan cancelled.', true);
+        btnStartScan.textContent = 'Scan QR Code';
+        btnStartScan.style.display = '';
+    });
+
+    // Served with a sample already in it. Read from a json_script block
+    // rather than interpolated into JS: the values are names and addresses,
+    // and a quote in one of them would end the statement.
+    var prefillNode = document.getElementById('validate-prefill');
+    if (prefillNode) {
+        var prefill = JSON.parse(prefillNode.textContent);
+        renderTransaction(prefill.transaction, prefill.transaction_id);
+        btnStartScan.textContent = 'Scan a real one';
+    }
+})();
+</script>
+{% endblock %}

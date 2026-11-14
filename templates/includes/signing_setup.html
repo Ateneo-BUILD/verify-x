@@ -1,0 +1,276 @@
+{% comment %}
+Setup's Credential signing card, for site admins (verify/views/core.py setup;
+the rows come from accounts/signing_status.py).
+
+Its own card, below Setup's form, because its buttons are forms of their own.
+It may do three reversible things here: pause credential signing, suspend a
+key, and upload a certificate for a key the signer generated. An
+organization's own key is made, requested or discarded from its Site page.
+Everything else -- resume, publish, activate, unsuspend, withdraw, and the
+Organization CA itself -- needs someone on the signer host, so a row names the
+command instead of offering a button. Except where the signer's policy sets
+`site_controls_all_keys` (`signing.site_controls_all_keys` is its own
+word): then the deployment's keys are published and started here,
+and any key unsuspended or withdrawn, and signing resumed, by any site admin.
+{% endcomment %}
+{% include "includes/signing_style.html" %}
+<div class="card" id="credential-signing">
+    <h2>Credential signing</h2>
+
+    {% if signing_notice %}
+    <div class="status-box {% if signing_notice.ok %}success{% else %}error{% endif %}" style="margin:0 0 1rem;">{{ signing_notice.text }}</div>
+    {% endif %}
+
+    {% if signing.missing %}
+    <div class="status-box error" style="margin:0 0 1rem;">
+        No credential can be minted: an issuer key is configured, but
+        {% for name in signing.missing %}<code>{{ name }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}
+        {{ signing.missing|length|pluralize:"is,are" }} not set in the instance <code>.env</code>.
+        Every document prints the plain QR until {{ signing.missing|length|pluralize:"it is,they are" }}.
+    </div>
+    {% endif %}
+    {% if signing.unreadable %}
+    <div class="status-box error" style="margin:0 0 1rem;">
+        This site cannot open its own document keys:
+        {% for name in signing.unreadable %}{{ name }}{% if not forloop.last %}, {% endif %}{% endfor %}.
+        They do not open with the instance's <code>CREDENTIAL_EPOCH_WRAP_KEY</code>, so phones
+        cannot sync and documents print the plain QR. This database came from somewhere
+        with another wrap key: put that key back in <code>.env</code>, or put back this
+        site's own database (<code>manage.py replace_database</code>).
+    </div>
+    {% endif %}
+    {% if signing.lost %}
+    <div class="status-box error" style="margin:0 0 1rem;">
+        The keys for
+        {% for name in signing.lost %}{{ name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+        are missing from this database, although documents were made with them, so
+        nothing is minted and no phone can sync. Put them back from a backup
+        (<code>manage.py replace_database</code> carries them in). If no backup has them,
+        <code>manage.py remake_epoch_keys</code> makes new ones, and the documents made
+        with the old ones never open again.
+    </div>
+    {% endif %}
+    {% if signing.failing %}
+    <div class="status-box error" style="margin:0 0 1rem;">
+        The signer has refused the last {{ signing.failing }} request{{ signing.failing|pluralize }}
+        with an internal error. Its journal says why: <code>journalctl -u cl03-signer</code>.
+    </div>
+    {% endif %}
+    {% if signing.pollers|length > 1 %}
+    <div class="status-box error" style="margin:0 0 1rem;">
+        {{ signing.pollers|length }} different signers have polled this site in the last few
+        minutes ({% for poller in signing.pollers %}<code>{{ poller }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}).
+        Only one may: each keeps a ledger the other does not see. Stop every signer
+        but the site's own.
+    </div>
+    {% endif %}
+    {% if signing.code.differs %}
+    <div class="status-box error" style="margin:0 0 1rem;">
+        The signer runs other code than this site (signer <code>{{ signing.code.signer }}</code>{% if signing.code.commit %}, commit <code>{{ signing.code.commit }}</code>{% endif %};
+        this site <code>{{ signing.code.site }}</code>). A deploy of the site never updates the signer:
+        on the signer host, run <code>install.sh</code> from this commit (<code>signer/deploy/README.md</code>, "Install").
+    </div>
+    {% endif %}
+
+    {% if signing.mode == "off" %}
+    <div class="info-box" style="margin-bottom:0;">
+        No issuer key is configured, so documents print without an offline
+        credential. Set <code>SIGNER_SOCKET</code> (a credential signer on this
+        server), <code>SIGNER_QUEUE_KEY</code> (one on a host of its own, which
+        polls this site) or <code>CREDENTIAL_ISSUER_KEY_PATH</code> (a key file)
+        in the instance <code>.env</code>.
+    </div>
+    {% elif signing.mode == "file" %}
+    <div class="info-box" style="margin-bottom:0;">
+        Signing with the key file on this server (key {{ signing.file_key_id }}).
+        No signer is set up.
+    </div>
+    {% elif signing.error %}
+    <div class="status-box error" style="margin:0;">
+        The signer did not answer ({{ signing.error }}). Documents print the
+        plain QR until it does. {% if signing.transport == "queue" %}Check that
+        <code>cl03-signer</code> is running on its own host and reaches this site:
+        its journal says why it does not, and its alerts too.{% else %}Check that
+        <code>cl03-signer</code> is running on this server.{% endif %}
+    </div>
+    {% else %}
+    <div class="sg-stats">
+        {% if signing.credential_paused %}
+        <div class="sg-stat"><div class="n bad">Paused</div><div class="l">Credential signing</div></div>
+        {% else %}
+        <div class="sg-stat"><div class="n ok">Running</div><div class="l">{% if signing.transport == "queue" %}Signer on its own host{% else %}Local signer{% endif %}</div></div>
+        {% endif %}
+        <div class="sg-stat"><div class="n">{{ signing.credentials_today }}{% if signing.credential_ceiling %} <small>of {{ signing.credential_ceiling }}</small>{% endif %}</div><div class="l">Credentials, last 24 h</div></div>
+        <div class="sg-stat"><div class="n">{{ signing.bundles_today }}</div><div class="l">Key bundles</div></div>
+        <div class="sg-stat"><div class="n{% if signing.ledger_behind %} bad{% endif %}">#{{ signing.ledger_shipped }}</div><div class="l">Ledger shipped through{% if signing.ledger_behind %}, {{ signing.ledger_behind }} behind{% endif %}</div></div>
+        {% if not signing.credential_paused %}
+        <div class="sg-push">
+            <form method="post" action="{% url 'signing_pause' %}"
+                  data-confirm="Pause credential signing? Documents print the plain QR until someone on the signer host resumes it.">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="setup">
+                <button type="submit" class="sg-stop">Pause credential signing</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    {% if signing.credential_paused %}
+    <div class="status-box error" style="margin:0 0 1rem;">
+        Credential signing is paused. Documents print the plain QR.
+        {% if signing.site_controls_all_keys %}
+        <form method="post" action="{% url 'signing_resume' %}" class="sg-inline"
+              data-confirm="Resume credential signing? Find out first why it was paused: the signer's alerts say who paused it, or that the global ceiling did.">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="setup">
+            <input type="hidden" name="context" value="credential">
+            <button type="submit">Resume credential signing</button>
+        </form>
+        {% else %}Resume on the signer host: <code>cl03signer resume credential</code>{% endif %}
+    </div>
+    {% endif %}
+    {% if signing.site_controls_all_keys %}{% for context in signing.paused %}{% if context != "credential" %}
+    <div class="status-box error" style="margin:0 0 1rem;">
+        Signing is paused for {{ context }}.
+        <form method="post" action="{% url 'signing_resume' %}" class="sg-inline">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="setup">
+            <input type="hidden" name="context" value="{{ context }}">
+            <button type="submit">Resume {{ context }}</button>
+        </form>
+    </div>
+    {% endif %}{% endfor %}{% endif %}
+
+    {% with ca=signing.organization_ca %}
+    {% if ca.site_domain and pairing_host and pairing_host != ca.site_domain %}
+    <div class="status-box error" style="margin:0 0 1rem;">
+        This site's pairing QR sends phones to {{ pairing_host }}, but the signer
+        is set up for {{ ca.site_domain }}. Phones paired with {{ pairing_host }}
+        will not trust keys its System CA certifies. Make them match:
+        <code>site_domain</code> on the signer host, or
+        <code>DEVICE_PAIRING_BASE_URL</code> here.
+    </div>
+    {% endif %}
+    <div class="sg-ca" id="organization-ca">
+        <div class="t">Organization CA</div>
+        {% if ca.current %}
+        <div>
+            <div class="who">{{ ca.current.name }} <span class="sg-pill {% if ca.current.for_site %}sg-active">Certified{% else %}sg-suspended">Not for this site{% endif %}</span></div>
+            {% if not ca.current.for_site %}<span class="sg-sub">{{ ca.reason }} Start a System CA for {{ ca.site_domain|default:"the site" }} on the signer host: <code>cl03signer ca keygen</code></span><br>{% endif %}
+            <span class="sg-sub">Certifies organization keys generated on this site, for phones paired with {{ ca.current.domains|join:", "|default:"no domain" }}. Ends {{ ca.current.ends|date:"j M Y" }} &middot; {{ ca.current.issued }} certificate{{ ca.current.issued|pluralize }} issued &middot; can issue until {{ ca.current.issue_until|date:"j M Y" }}{% if ca.waiting %} &middot; CA {{ ca.waiting }} waits for its certificate: <code>cl03signer ca install ca.pem</code>{% endif %}</span>
+        </div>
+        <div class="end sg-sub">If this server is broken into:<br><code>cl03signer ca withdraw {{ ca.current.ca_id }}</code></div>
+        {% elif ca.waiting %}
+        <div>
+            <div class="who">CA {{ ca.waiting }} <span class="sg-pill sg-generated">Needs certificate</span></div>
+            <span class="sg-sub">Send its request to the PKI, then install the certificate on the signer host: <code>cl03signer ca install ca.pem</code></span>
+        </div>
+        <div></div>
+        {% else %}
+        <div>
+            <div class="who">None</div>
+            <span class="sg-sub">Organizations can still request certificates from the PKI. To generate them here, start a CA on the signer host. It prints a request for the PKI; then install the PKI's certificate: <code>cl03signer ca keygen</code>, then <code>cl03signer ca install ca.pem</code></span>
+        </div>
+        <div></div>
+        {% endif %}
+    </div>
+    {% endwith %}
+
+    <div class="sg-scroll">
+    <table class="sg-table">
+        <thead><tr><th>Key</th><th>Signs for</th><th>State</th><th>Certified by</th><th>Signs until</th><th>Certificate ends</th><th></th></tr></thead>
+        <tbody>
+        {% for row in signing.rows %}
+        <tr>
+            <td class="kid">{{ row.key_id }}</td>
+            <td>
+                {% if row.legacy %}Key file, before the signer
+                {% elif row.organization_id %}
+                    {% if row.organization %}<a href="{% url 'site_organization' row.organization.id %}#signing">{{ row.organization.name }}</a>{% else %}{{ row.certified_name|default:"An organization not on this site" }}{% endif %}
+                    {% if row.next %}<span class="sg-sub">next key</span>{% endif %}
+                {% else %}This deployment
+                    {% if row.raw %}<span class="sg-sub">development key, held by the signer</span>{% endif %}
+                    {% if row.next %}<span class="sg-sub">next key</span>{% elif row.state == "active" %}<span class="sg-sub">organizations without a key</span>{% endif %}
+                {% endif %}
+            </td>
+            <td><span class="sg-pill sg-{{ row.css }}">{{ row.label }}</span></td>
+            <td>{% if row.by_organization_ca %}<span title="{{ row.certified_by }}">Organization CA</span>{% elif row.certified_by %}<span title="{{ row.certified_by }}">PKI</span>{% else %}<span class="sg-sub">{% if row.legacy or row.raw %}not certified{% else %}none yet{% endif %}</span>{% endif %}</td>
+            <td class="sg-num">
+                {% if row.state == "generated" %}<span class="sg-sub">after certification</span>
+                {% elif row.state == "retired" or row.legacy %}<span class="sg-sub">stopped {{ row.signs_until|date:"j M Y" }}</span>
+                {% elif row.signs_until %}{{ row.signs_until|date:"j M Y" }}
+                    {% if row.days_left is not None %}<span class="sg-sub{% if row.warn %} sg-warn{% endif %}">in {{ row.days_left }} day{{ row.days_left|pluralize }}</span>{% endif %}
+                    {% if row.state == "published" %}<span class="sg-sub">once switched</span>{% endif %}
+                {% endif %}
+            </td>
+            <td class="sg-num">{% if row.cert_ends %}{{ row.cert_ends|date:"j M Y" }}{% elif row.legacy or row.raw %}<span class="sg-sub">no certificate</span>{% else %}<span class="sg-sub">none yet</span>{% endif %}</td>
+            <td>
+                {% if row.can_suspend %}
+                <form method="post" action="{% url 'signing_suspend' row.key_id %}" class="sg-inline"
+                      data-confirm="Suspend key {{ row.key_id }}? It signs no more credentials until someone on the signer host resumes it.">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="setup">
+                    <button type="submit">Suspend</button>
+                </form>
+                {% endif %}
+                {% if row.can_upload %}
+                    {% if row.organization %}
+                    <a href="{% url 'site_organization' row.organization.id %}#signing" style="font-size:0.75rem;">Upload certificate</a>
+                    {% elif not row.organization_id %}
+                    <form method="post" action="{% url 'signing_certificate' row.key_id %}" enctype="multipart/form-data" class="sg-upload">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="setup">
+                        <input type="file" name="certificate" accept=".pem,.crt,.cer,.der" aria-label="Certificate for key {{ row.key_id }}">
+                        <button type="submit">Upload</button>
+                    </form>
+                    {% endif %}
+                {% endif %}
+                {% if not row.organization_id %}{% if row.can_publish %}
+                <form method="post" action="{% url 'signing_publish' row.key_id %}" class="sg-inline"
+                      data-confirm="Publish key {{ row.key_id }}? Phones list it at their next sync. Nothing is signed with it until it is started.">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="setup">
+                    <button type="submit">Publish key {{ row.key_id }}</button>
+                </form>
+                {% endif %}{% if row.can_activate %}
+                <form method="post" action="{% url 'signing_activate' row.key_id %}" class="sg-inline"
+                      data-confirm="Start signing with key {{ row.key_id }}? It signs every bundle, feed and statement from now on, and the deployment key it replaces retires.">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="setup">
+                    <button type="submit"{% if not row.gate_open %} disabled{% endif %}>Start signing with key {{ row.key_id }}</button>
+                </form>
+                {% endif %}{% endif %}
+                {% if row.can_unsuspend %}
+                <form method="post" action="{% url 'signing_unsuspend' row.key_id %}" class="sg-inline"
+                      data-confirm="Resume key {{ row.key_id }}? It signs again at once.">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="setup">
+                    <button type="submit">Resume</button>
+                </form>
+                {% endif %}
+                {% if row.can_withdraw %}
+                <form method="post" action="{% url 'signing_withdraw' row.key_id %}" class="sg-inline"
+                      data-confirm="Withdraw key {{ row.key_id }} for good? Phones drop it at their next sync and refuse everything it signed. {% if row.organization_id %}Its organization's documents fall back to the deployment key.{% else %}If it is the active deployment key, nothing signs bundles until another is active, and every phone's sync is refused meanwhile.{% endif %} This cannot be undone.">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="setup">
+                    <button type="submit" class="sg-stop">Withdraw</button>
+                </form>
+                {% endif %}
+                {% if row.gate %}<span class="sg-sub">{% include "includes/signing_gate.html" with gate=row.gate verb="switch" %}</span>{% endif %}
+                {% if row.last_expiry %}<span class="sg-sub">Phones check its credentials until {{ row.last_expiry|date:"j M Y" }}.</span>{% endif %}
+                {% if row.note %}<span class="sg-sub">{{ row.note }}</span>{% endif %}
+                {% if row.host_command %}<span class="sg-sub">On the signer host: <code>{{ row.host_command }}</code></span>{% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="sg-sub">The signer holds no keys yet. Make one on the signer host: <code>cl03signer keygen</code></td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    <p class="sg-hint">
+        A key signs credentials until &ldquo;Signs until&rdquo;, so every
+        credential it signs expires before its certificate ends. Phones keep
+        accepting those credentials until then.
+    </p>
+    {% endif %}
+</div>

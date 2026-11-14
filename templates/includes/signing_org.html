@@ -1,0 +1,147 @@
+{% comment %}
+An organization's Credential signing section (accounts/signing_status.py
+for_organization). A site admin sees it on the organization's Site page and
+may start its next certificate there -- generated at once by the Organization
+CA, or requested from the PKI and uploaded when it returns -- and discard a
+key that is not yet published. Where the
+signer's policy lets the site publish, the admin also publishes the key and
+then starts it signing once its phones have it. The organization's own
+admins see the same facts on their Organization page, read-only. Who may
+press Publish and Start is `may_switch_keys`: a superuser's own login, or
+any site admin where the signer's policy sets `site_controls_all_keys`.
+
+Arguments: `org_signing`, `org`, and `upload` (true for a site admin).
+{% endcomment %}
+{% include "includes/signing_style.html" %}
+<div class="card" id="signing">
+    <h2>Credential signing</h2>
+    {% if org_signing.mode != "signer" %}
+    <p class="sg-hint" style="margin:0;">
+        Documents are signed with this site's own key. Phones show the issuer
+        as stated in the document, not certified.
+    </p>
+    {% elif org_signing.error %}
+    <div class="status-box error" style="margin:0;">The signer did not answer, so this organization's signing status is unknown.</div>
+    {% else %}
+    {% if signing_notice and upload %}
+    <div class="status-box {% if signing_notice.ok %}success{% else %}error{% endif %}" style="margin:0 0 0.8rem;">{{ signing_notice.text }}</div>
+    {% endif %}
+    {% with current=org_signing.current waiting=org_signing.next %}
+    {% if current %}
+    <dl class="sg-facts">
+        <dt>Key</dt><dd>{{ current.key_id }} <span class="sg-pill sg-{{ current.css }}">{{ current.label }}</span></dd>
+        <dt>Certified as</dt><dd>{{ current.certified_name }}</dd>
+        {% if current.certified_by %}<dt>Certified by</dt><dd>{{ current.certified_by }}{% if not current.by_organization_ca %} (PKI){% endif %}</dd>{% endif %}
+        <dt>Signs until</dt><dd class="sg-num">{{ current.signs_until|date:"j M Y" }}{% if current.warn %} <span class="sg-warn">in {{ current.days_left }} day{{ current.days_left|pluralize }}</span>{% endif %}</dd>
+        <dt>Certificate ends</dt><dd class="sg-num">{{ current.cert_ends|date:"j M Y" }}</dd>
+        {% if waiting %}<dt>Next key</dt><dd>{{ waiting.key_id }} <span class="sg-pill sg-{{ waiting.css }}">{{ waiting.label }}</span></dd>{% endif %}
+    </dl>
+    {% if current.not_for_site %}
+    <p class="sg-hint sg-warn">{{ current.note }}</p>
+    {% endif %}
+    {% if current.suspended %}
+    <p class="sg-hint">Key {{ current.key_id }} is suspended, so this organization's documents print the plain QR until it is resumed {% if org_signing.site_controls_all_keys %}from Setup's Credential signing card{% else %}on the signer host{% endif %}.</p>
+    {% endif %}
+    {% if org_signing.renamed %}
+    <p class="sg-hint">The certificate names &ldquo;{{ current.certified_name }}&rdquo;, so new documents keep that name until the next certificate names &ldquo;{{ org.name }}&rdquo;.</p>
+    {% endif %}
+    {% if not upload %}
+    <p class="sg-hint">Phones show this organization's documents as issued by {{ current.certified_name }}, certified by {{ current.certified_by|default:"this system" }}. A site admin renews the certificate before {{ current.signs_until|date:"j M Y" }}.</p>
+    {% endif %}
+    {% elif waiting %}
+    <dl class="sg-facts">
+        <dt>Key</dt><dd>{{ waiting.key_id }} <span class="sg-pill sg-{{ waiting.css }}">{{ waiting.label }}</span></dd>
+    </dl>
+    <p class="sg-hint">Until it is active, documents are signed with this site's own key and phones show the issuer as stated, not certified.</p>
+    {% else %}
+    <p class="sg-hint" style="margin-top:0;">
+        No certificate of its own. Documents are signed with this site's key,
+        and phones show the issuer as stated in the document, not certified.
+    </p>
+    {% endif %}
+
+    {% if upload %}
+        {% with ca=org_signing.organization_ca %}
+        {% if org_signing.can_start %}
+        <div class="sg-next">
+            <h4>{% if current %}Next certificate{% else %}Certificate{% endif %}</h4>
+            <div class="sg-names">Names <b>{{ org.name }}</b>, signing ID <code>{{ org_signing.signing_id }}</code>. <a href="#org-form" class="sg-link">Wrong name? Edit the organization first.</a></div>
+            <form method="post" action="{% url 'signing_generate' org.id %}" class="sg-way"
+                  data-confirm="Generate a certificate naming “{{ org.name }}”? Phones show this name on its documents until its next certificate.">
+                {% csrf_token %}
+                <input type="hidden" name="name" value="{{ org.name }}">
+                <button type="submit"{% if not ca.can_generate %} disabled{% endif %}>Generate certificate</button>
+                <p class="sg-hint">{% if ca.can_generate %}Certified at once by {{ ca.current.name }}. Signs until {{ ca.signs_until|date:"j M Y" }}.{% else %}{{ ca.reason }} Request one from the PKI instead.{% endif %}</p>
+            </form>
+            <form method="post" action="{% url 'signing_request' org.id %}" class="sg-way">
+                {% csrf_token %}
+                <button type="submit" class="sg-ghost">Request from the PKI</button>
+                <p class="sg-hint">Makes the key and gives you its request (.csr) for the PKI. Upload the certificate here when it returns.</p>
+            </form>
+        </div>
+        {% elif waiting %}
+        <div class="sg-next">
+            <h4>Key {{ waiting.key_id }}{% if waiting.state == "generated" %}, waiting for the PKI{% endif %}</h4>
+            {% if waiting.can_request %}
+            <div class="sg-acts">
+                <a href="{% url 'signing_csr' waiting.key_id %}" class="sg-link" download>Download request (.csr)</a>
+                <p class="sg-hint">Send it to the PKI with signing ID <code>{{ org_signing.signing_id }}</code>.</p>
+            </div>
+            {% endif %}
+            {% if waiting.can_upload %}
+            <form method="post" action="{% url 'signing_certificate' waiting.key_id %}" enctype="multipart/form-data" class="sg-upload">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="org:{{ org.id }}">
+                <input type="file" name="certificate" accept=".pem,.crt,.cer,.der" aria-label="Certificate for key {{ waiting.key_id }}">
+                <button type="submit">Upload certificate</button>
+            </form>
+            {% endif %}
+            {% if waiting.not_for_site and not waiting.host_command %}
+            <p class="sg-hint sg-warn" style="margin:0;">{{ waiting.note }}</p>
+            {% endif %}
+            {% if waiting.state == "certified" %}
+            <p class="sg-hint" style="margin:0;">Certified by {{ waiting.certified_by }} as &ldquo;{{ waiting.certified_name }}&rdquo;. Signs until {{ waiting.signs_until|date:"j M Y" }} once switched in.</p>
+            {% endif %}
+            {% if waiting.can_publish or waiting.can_activate %}{% if not may_switch_keys %}
+            <p class="sg-hint" style="margin:0;">{% if waiting.can_publish %}Publishing{% else %}Starting{% endif %} key {{ waiting.key_id }} takes a Django superuser's own login: sign in at Django admin and come back to this page.</p>
+            {% endif %}{% endif %}
+            {% if waiting.can_publish and may_switch_keys %}
+            <form method="post" action="{% url 'signing_publish' waiting.key_id %}" class="sg-way"
+                  data-confirm="Publish key {{ waiting.key_id }}? Phones get it at their next sync, and once it signs they show “{{ waiting.certified_name }}” as certified. Only the signer host can withdraw it.">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="org:{{ org.id }}">
+                <button type="submit">Publish key {{ waiting.key_id }}</button>
+                <p class="sg-hint">Phones get it at their next sync. Nothing is signed with it yet.</p>
+            </form>
+            {% endif %}
+            {% if waiting.can_activate and may_switch_keys %}
+            {% if waiting.gate %}
+            <p class="sg-hint" style="margin:0;">{% include "includes/signing_gate.html" with gate=waiting.gate verb="start" %}</p>
+            {% endif %}
+            <form method="post" action="{% url 'signing_activate' waiting.key_id %}" class="sg-way"
+                  data-confirm="Start signing with key {{ waiting.key_id }}? New documents for {{ org.name }} are signed with it from now on.">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="org:{{ org.id }}">
+                <button type="submit"{% if not waiting.gate_open %} disabled{% endif %}>Start signing with key {{ waiting.key_id }}</button>
+                <p class="sg-hint">New {{ org.name }} documents are signed with key {{ waiting.key_id }}, and phones show them as certified by {{ waiting.certified_by }}.{% if current %} Key {{ current.key_id }} retires.{% endif %} {% if org_signing.site_controls_all_keys %}A key is withdrawn from Setup's Credential signing card.{% else %}Withdrawing a key is done on the signer host.{% endif %}</p>
+            </form>
+            {% endif %}
+            {% if waiting.host_command %}
+            <p class="sg-hint" style="margin:0;">On the signer host: <code>{{ waiting.host_command }}</code>{% if waiting.note %} &middot; {{ waiting.note }}{% endif %}</p>
+            {% endif %}
+            {% if waiting.can_discard %}
+            <form method="post" action="{% url 'signing_discard' waiting.key_id %}" class="sg-acts sg-inline"
+                  data-confirm="Discard key {{ waiting.key_id }}? Its private key is destroyed; then generate or request again.">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="org:{{ org.id }}">
+                <button type="submit">Discard key {{ waiting.key_id }}</button>
+                <span class="sg-hint">Destroys the key. Then generate or request again.</span>
+            </form>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endwith %}
+    {% endif %}
+    {% endwith %}
+    {% endif %}
+</div>

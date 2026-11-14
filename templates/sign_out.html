@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% comment %}
+What a GET of /logout/ shows: a bookmark or a typed address. Signing out is a
+POST with the CSRF token, so another site cannot end somebody's session with
+a link or an image.
+{% endcomment %}
+
+{% block title %}{{ site_title }}: Sign out{% endblock %}
+
+{% block body %}
+<div class="container container--narrow">
+
+    <div class="branding-header">
+        <img src="{% static 'nationalid-everify-logo.png' %}" alt="National ID eVerify">
+    </div>
+
+    <h1>Sign out?</h1>
+    <div class="card" style="max-width:560px; margin:0 auto;">
+        <p style="font-size:0.9rem; color:#555; margin-top:0;">
+            Signing out ends this session. Anything verified and not yet logged
+            is dropped.
+        </p>
+        <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit">Sign out</button>
+        </form>
+        <p class="hint" style="text-align:center;">
+            <a href="{% url 'app' %}">Stay signed in</a>
+        </p>
+    </div>
+
+    {% include "includes/branding_footer.html" %}
+</div>
+{% endblock %}

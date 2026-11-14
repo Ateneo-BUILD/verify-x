@@ -1,0 +1,1394 @@
+{% extends "base.html" %}
+{% load static %}
+{% load demo %}
+
+{% block title %}{{ site_title }}: Organization{% endblock %}
+
+{% block extra_head %}
+<style>
+    .stats-grid {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+    }
+    .stat-card {
+        flex: 1;
+        background: var(--card-background);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 0.4rem 0.5rem;
+        text-align: center;
+    }
+    .stat-card .stat-value {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        line-height: 1.2;
+    }
+    .stat-card .stat-label {
+        font-size: 0.65rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .admin-table th,
+    .admin-table td {
+        border: 1px solid var(--border-color);
+        padding: 0.4rem 0.5rem;
+        text-align: left;
+        font-size: 0.8rem;
+    }
+    .admin-table th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+        color: var(--secondary-color);
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    .admin-table tr:hover { background-color: #f8f9fa; }
+    .user-list { list-style: none; padding: 0; margin: 0; }
+    .user-item {
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.4rem;
+        background: #fff;
+    }
+    .user-item:hover { background: #f8f9fa; }
+    .user-row1 {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+    }
+    .user-row1 .user-name { font-weight: 600; flex: 1; min-width: 0; }
+    .user-row1 .user-actions { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
+    .user-row2 {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 0.75rem;
+        color: #666;
+        margin-top: 0.25rem;
+    }
+    .user-row2 .label { color: #999; }
+    .user-row2 .id-val { font-family: monospace; font-size: 0.78rem; }
+    /* Sign-in is only attempted for a National ID already on file, so a
+       member recorded by card number alone cannot sign in with the digital
+       ID printed on the same card until they have been here once. Say so
+       where it can be fixed. See login_guard.registered_operator(). */
+    .user-row2 .id-warn {
+        color: #92400e;
+        background: #fef3c7;
+        border-radius: 4px;
+        padding: 0 0.35rem;
+        cursor: help;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        border-radius: 3px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .badge-success { background: #e9f7ec; color: #28a745; }
+    .badge-error { background: #fdecea; color: #dc3545; }
+    .badge-admin { background: #eef; color: var(--primary-color); }
+    .badge-operator { background: #f0f0f0; color: #666; }
+
+    .container button.btn-remove {
+        background-color: #dc3545;
+        width: auto;
+        padding: 0.25rem 0.6rem;
+        font-size: 0.75rem;
+        margin-top: 0;
+    }
+    .container button.btn-remove:hover { background-color: #b02a37; }
+    .tt-shared {
+        display: inline-flex; align-items: center; gap: 0.3rem; flex-shrink: 0;
+        margin: 0 0.5rem 0 0; font-size: 0.75rem; color: #555;
+        text-transform: none; letter-spacing: 0; white-space: nowrap; cursor: pointer;
+    }
+    .tt-shared input { width: auto; margin: 0; }
+
+    .add-user-form {
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-end;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 4px;
+        border: 1px solid var(--border-color);
+    }
+    .add-user-form .form-group {
+        margin-bottom: 0;
+        flex: 1;
+        min-width: 150px;
+    }
+    .add-user-form .form-group label {
+        font-size: 0.75rem;
+        margin-bottom: 0.2rem;
+    }
+    .add-user-form .form-group input,
+    .add-user-form .form-group select {
+        padding: 0.5rem 0.6rem;
+        font-size: 0.85rem;
+    }
+    .container button.btn-add {
+        width: auto;
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+        margin-top: 0;
+        white-space: nowrap;
+        align-self: flex-end;
+    }
+
+    .role-select {
+        padding: 0.2rem 0.4rem;
+        font-size: 0.8rem;
+        border: 1.5px solid #999;
+        border-radius: 3px;
+        cursor: pointer;
+        background: #fff;
+    }
+
+    #admin-status {
+        margin-bottom: 1rem;
+        padding: 0.65rem 0.85rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        display: none;
+    }
+    #admin-status.success { display: block; background: #e9f7ec; color: #28a745; border: 1px solid #28a745; }
+    #admin-status.error { display: block; background: #fdecea; color: #dc3545; border: 1px solid #dc3545; }
+
+    /* A setting that is on or off, and the switch that changes it. The same
+       switch the Site page's organization form uses for Enabled. */
+    .toggle-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+    .toggle-row .toggle-label { display: block; font-weight: 600; font-size: 0.95rem; cursor: pointer; }
+    .toggle-row .hint { line-height: 1.45; }
+    .switch { position: relative; display: inline-block; flex: 0 0 auto; width: 46px; height: 26px; cursor: pointer; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .slider {
+        position: absolute; inset: 0; background-color: #8b98a5;
+        border-radius: 26px; cursor: pointer; transition: background-color 0.2s;
+    }
+    .switch .slider::before {
+        content: ""; position: absolute; height: 20px; width: 20px;
+        left: 3px; top: 3px; background-color: #fff; border-radius: 50%;
+        transition: transform 0.2s;
+    }
+    .switch input:checked + .slider { background-color: var(--primary-color); }
+    .switch input:checked + .slider::before { transform: translateX(20px); }
+    .switch input:focus-visible + .slider { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+    .switch input:disabled + .slider { cursor: not-allowed; }
+
+    /* Repeat alert sits under Check User Records because it is part of it:
+       with the list off there is nothing to warn from, so it greys out. */
+    .toggle-row.is-off > div:first-child { opacity: 0.55; }
+    .toggle-row.is-off .switch { opacity: 0.55; }
+    .repeat-window {
+        display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+        margin-top: 0.6rem; font-size: 0.9rem;
+    }
+    .repeat-window label { font-weight: 400; margin: 0; }
+    .repeat-window input {
+        width: 5.5rem; padding: 0.4rem 0.55rem; font-size: 0.9rem; font-family: inherit;
+        border: 1.5px solid #999; border-radius: 4px; box-sizing: border-box;
+        font-variant-numeric: tabular-nums;
+    }
+    .repeat-window input:focus {
+        outline: none; border-color: var(--primary-color);
+        box-shadow: 0 0 0 2px rgba(0, 82, 155, 0.15);
+    }
+    .repeat-window input:disabled { background: #f0f0f0; color: #777; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container">
+    {% csrf_token %}
+    {% include "includes/app_nav.html" with active_nav="admin" %}
+    {% include "includes/org_banner.html" %}
+    {% include "includes/context_strip.html" %}
+
+    <!-- Statistics -->
+    <div class="card">
+        <h2 class="toggle-header" data-target="stats-body" style="cursor:pointer; user-select:none; margin-bottom:0;">
+            <span class="toggle-arrow" style="display:inline-block; transition:transform 0.2s; margin-right:0.3rem;">&#9660;</span>
+            Statistics
+        </h2>
+        <div id="stats-body">
+            <div class="stats-grid" style="margin-top:0.75rem;">
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-users">{{ total_users }}</div>
+                    <div class="stat-label">People</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-total">{{ total_verifications }}</div>
+                    <div class="stat-label">Total Verifications</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-success">{{ successful_verifications }}</div>
+                    <div class="stat-label">Successful</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-failed">{{ failed_verifications }}</div>
+                    <div class="stat-label">Failed</div>
+                </div>
+            </div>
+            <div style="display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap; margin-top:0.75rem;">
+                <div class="form-group" style="flex:1; min-width:140px; margin-bottom:0;">
+                    <label for="stats-start" style="font-size:0.75rem;">Start Date</label>
+                    <input type="date" id="stats-start"
+                           style="width:100%; padding:0.4rem 0.5rem; font-size:0.85rem; border:1.5px solid #999; border-radius:4px;">
+                </div>
+                <div class="form-group" style="flex:1; min-width:140px; margin-bottom:0;">
+                    <label for="stats-end" style="font-size:0.75rem;">End Date</label>
+                    <input type="date" id="stats-end"
+                           style="width:100%; padding:0.4rem 0.5rem; font-size:0.85rem; border:1.5px solid #999; border-radius:4px;">
+                </div>
+                <button class="btn-add" id="btn-stats-filter" style="white-space:nowrap; padding:0.5rem 1rem;">Filter</button>
+                <button class="btn-add" id="btn-stats-clear" style="white-space:nowrap; padding:0.5rem 1rem; background:#6c757d;">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="admin-status"></div>
+
+    {% comment %}
+    Two columns on a wide window: the lists that change day to day -- people,
+    locations, transaction types -- on the left, exports and settings on the
+    right. The settings come first in the markup because that is the order a
+    narrow window has always shown; .page-cols puts them on the right.
+    {% endcomment %}
+    <div class="page-cols">
+    <div class="page-side">
+
+    <!-- Export Log -->
+    <div class="card">
+        <h2 class="toggle-header" data-target="export-body" style="cursor:pointer; user-select:none; margin-bottom:0;">
+            <span class="toggle-arrow" style="display:inline-block; transition:transform 0.2s; margin-right:0.3rem;">&#9660;</span>
+            Export Log
+        </h2>
+        <div id="export-body">
+            <form id="export-form" action="{% url 'admin_export_transactions' %}" method="get" target="_blank" style="margin-top:0.75rem;">
+                <div style="display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap;">
+                    <div class="form-group" style="flex:1; min-width:140px; margin-bottom:0;">
+                        <label for="export-start" style="font-size:0.75rem;">Start Date</label>
+                        <input type="date" id="export-start" name="start"
+                               style="width:100%; padding:0.4rem 0.5rem; font-size:0.85rem; border:1.5px solid #999; border-radius:4px;">
+                    </div>
+                    <div class="form-group" style="flex:1; min-width:140px; margin-bottom:0;">
+                        <label for="export-end" style="font-size:0.75rem;">End Date</label>
+                        <input type="date" id="export-end" name="end"
+                               style="width:100%; padding:0.4rem 0.5rem; font-size:0.85rem; border:1.5px solid #999; border-radius:4px;">
+                    </div>
+                    <button type="submit" class="btn-add" id="btn-export" style="white-space:nowrap; padding:0.5rem 1rem;" disabled>
+                        Export Transaction Logs (CSV)
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% comment %}
+    The phones' activity log, as far as it is THIS organization's: only the
+    records a phone filed under it, which it can do only while linked to it
+    (Devices page, "Works for"). Not everything its members' phones did -- a
+    person may work for several organizations, and the whole log stays on
+    the site admin page.
+    {% endcomment %}
+    <div class="card">
+        <h2 class="toggle-header" data-target="device-log-body" style="cursor:pointer; user-select:none; margin-bottom:0;">
+            <span class="toggle-arrow" style="display:inline-block; transition:transform 0.2s; margin-right:0.3rem;">&#9660;</span>
+            Device Logs
+        </h2>
+        <div id="device-log-body">
+            <form id="device-log-export-form" action="{% url 'admin_export_device_logs' %}" method="get" target="_blank" style="margin-top:0.75rem;">
+                <div style="display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap;">
+                    <div class="form-group" style="flex:1; min-width:140px; margin-bottom:0;">
+                        <label for="device-log-start" style="font-size:0.75rem;">Start Date</label>
+                        <input type="date" id="device-log-start" name="start"
+                               style="width:100%; padding:0.4rem 0.5rem; font-size:0.85rem; border:1.5px solid #999; border-radius:4px;">
+                    </div>
+                    <div class="form-group" style="flex:1; min-width:140px; margin-bottom:0;">
+                        <label for="device-log-end" style="font-size:0.75rem;">End Date</label>
+                        <input type="date" id="device-log-end" name="end"
+                               style="width:100%; padding:0.4rem 0.5rem; font-size:0.85rem; border:1.5px solid #999; border-radius:4px;">
+                    </div>
+                    <button type="submit" class="btn-add" id="btn-device-log-export" style="white-space:nowrap; padding:0.5rem 1rem;">
+                        Export Device Logs (CSV)
+                    </button>
+                </div>
+            </form>
+            <div class="hint" style="margin-top:0.5rem;">
+                What paired phones recorded while working for
+                {{ current_org.name }}: one row per record, in each
+                phone&rsquo;s own order. Give both dates, or neither for
+                everything held. Records a phone made for another
+                organization are not here.
+            </div>
+        </div>
+    </div>
+
+    <!-- Users -->
+    <!-- Organization profile -->
+    <div class="card">
+        <h2 class="toggle-header" data-target="profile-body" style="cursor:pointer; user-select:none; margin-bottom:0;">
+            <span class="toggle-arrow" style="display:inline-block; transition:transform 0.2s; margin-right:0.3rem;">&#9660;</span>
+            Profile
+        </h2>
+        <div id="profile-body" style="margin-top:1rem;">
+            <div style="display:flex; gap:1rem; align-items:flex-start; flex-wrap:wrap;">
+                <div style="text-align:center;">
+                    <div id="logo-preview">
+                        {% if current_org.logo_data %}
+                        <img class="org-logo" src="{{ current_org.logo_data }}" alt=""
+                             style="max-height:64px; max-width:140px; border-radius:8px;">
+                        {% else %}
+                        <span class="org-mark lg" style="background:{{ current_org.mark_color }};">{{ current_org.initials }}</span>
+                        {% endif %}
+                    </div>
+                    <input type="file" id="logo-file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none;">
+                    <label for="logo-file" class="btn btn-secondary btn-sm"
+                           style="margin-top:0.5rem; cursor:pointer; font-size:0.75rem;">Upload logo</label>
+                    <button type="button" class="btn-remove" id="btn-clear-logo"
+                            style="margin-top:0.35rem; width:100%;">Clear</button>
+                </div>
+                <div style="flex:1; min-width:240px;">
+                    <div class="form-group">
+                        <label for="org-name">Organization name</label>
+                        <input type="text" id="org-name" value="{{ current_org.name }}" maxlength="255"
+                               {% if name_locked %}disabled{% endif %}>
+                        <div class="hint">Shown in the banner on every page, and on the printed verification document.
+                            {% if name_locked %}It is what this organization&rsquo;s documents say issued them, so now
+                            that it has verified people only a site administrator can change it.{% endif %}</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="org-subtitle">Banner subtitle</label>
+                        <input type="text" id="org-subtitle" value="{{ current_org.subtitle }}" maxlength="255"
+                               placeholder="Optional">
+                    </div>
+                    <div class="form-group">
+                        <label for="org-color">Mark colour</label>
+                        <input type="color" id="org-color" value="{{ current_org.mark_color }}"
+                               style="width:64px; padding:0.2rem; height:36px;">
+                        <div class="hint">Used behind the initials when no logo is uploaded.</div>
+                    </div>
+                    <button class="btn-add" id="btn-save-profile">Save profile</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- eVerify credentials -->
+    <div class="card">
+        <h2 class="toggle-header" data-target="everify-body" style="cursor:pointer; user-select:none; margin-bottom:0;">
+            <span class="toggle-arrow" style="display:inline-block; transition:transform 0.2s; margin-right:0.3rem;">&#9660;</span>
+            eVerify credentials
+        </h2>
+        <div id="everify-body" style="margin-top:1rem;">
+            {% if not current_org.everify_configured %}
+            <div class="status-box error" style="margin-top:0;">
+                No credentials set. This organization cannot verify anyone until it has
+                a base URL, a client ID and a client secret.
+            </div>
+            {% endif %}
+            <div class="info-box">
+                These are the credentials <strong>verifications</strong> run against, so this
+                organization&rsquo;s usage is billed to them. Signing operators in uses the
+                site-level client instead, which a site administrator sets in Setup.
+            </div>
+            <div class="form-group">
+                <label for="ev-base-url">Base URL</label>
+                <input type="url" id="ev-base-url" value="{{ current_org.everify_base_url|demo_url:demo_mode }}"
+                       readonly placeholder="Not set" style="background:#f1f3f5; color:#4a5560; cursor:default;">
+                <div class="hint">
+                    Set by a site administrator{% if user.is_site_admin %}, on
+                    <a href="{% url 'site_organization' current_org.id %}">this organization&rsquo;s Site page</a>{% endif %}.
+                    Whatever answers at this address decides who a verified person is,
+                    so it is not changed here.
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="ev-client-id">Client ID</label>
+                <input type="text" id="ev-client-id" value="{{ current_org.everify_client_id|demo_id:demo_mode }}"
+                       {% if demo_mode %}readonly{% endif %}
+                       maxlength="255" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label for="ev-client-secret">Client Secret</label>
+                <input type="password" id="ev-client-secret" value="" autocomplete="new-password"
+                       placeholder="{% if current_org.everify_client_secret %}Stored - leave blank to keep{% else %}Not set{% endif %}">
+                <div class="hint">
+                    Status:
+                    {% if current_org.everify_client_secret %}
+                        <strong>set</strong>. It is never shown again after saving; leave this
+                        blank to keep it, or type a new one to replace it.
+                        <label style="font-weight:400; display:block; margin-top:0.25rem;">
+                            <input type="checkbox" id="ev-clear-secret" style="width:auto; margin-right:0.35rem;">Clear the stored secret
+                        </label>
+                    {% else %}
+                        <strong>not set</strong>. eVerify shows the secret once at issue; paste it here.
+                    {% endif %}
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="ev-public-key">Public API Key</label>
+                <input type="password" id="ev-public-key" value="" autocomplete="new-password"
+                       placeholder="{% if current_org.everify_public_api_key %}Stored - leave blank to keep{% else %}Not set{% endif %}">
+                <div class="hint">
+                    Used by the liveness SDK in the operator&rsquo;s browser.
+                    {% if current_org.everify_public_api_key %}
+                    <label style="font-weight:400; display:block; margin-top:0.25rem;">
+                        <input type="checkbox" id="ev-clear-public-key" style="width:auto; margin-right:0.35rem;">Clear the stored key
+                    </label>
+                    {% endif %}
+                </div>
+            </div>
+            <button class="btn-add" id="btn-save-everify">Save credentials</button>
+        </div>
+    </div>
+
+    <!-- Verification -->
+    {% comment %}
+    What this organization's operators see after a verification. Check User
+    Records decides only whether THEY see the person's history; this
+    organization's own records appear in other organizations' lists either
+    way, less the types it keeps to itself. The switch is a site
+    admin's: it opens every organization's records to this
+    one. See accounts/user_records.py.
+    {% endcomment %}
+    <div class="card">
+        <h2 class="toggle-header" data-target="verification-body" style="cursor:pointer; user-select:none; margin-bottom:0;">
+            <span class="toggle-arrow" style="display:inline-block; transition:transform 0.2s; margin-right:0.3rem;">&#9660;</span>
+            Verification
+        </h2>
+        <div id="verification-body" style="margin-top:1rem;">
+            <div class="toggle-row">
+                <div>
+                    <label class="toggle-label" for="check-user-records">Check User Records</label>
+                    <div class="hint">
+                        After a successful verification, the verification page lists the
+                        person&rsquo;s earlier transactions from every organization: when, which
+                        organization, the transaction type, and the operator who handled it.
+                        Operators can search and page through the list. It is shown on screen
+                        only, never printed or exported, and every look at it is recorded.
+                        {% if not is_site_admin %}A site administrator turns it on or off.{% endif %}
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="check-user-records"
+                           {% if not is_site_admin %}disabled{% endif %}
+                           {% if current_org.check_user_records %}checked{% endif %}>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            {% comment %}
+            Part of User Records, so it greys out while the list is off. HERE
+            is settled by the server, by organization id; whether the TYPE
+            matches is the document page's, because it follows the picker.
+            See accounts/user_records.py.
+            {% endcomment %}
+            <div class="toggle-row" id="repeat-alert-row">
+                <div>
+                    <label class="toggle-label" for="repeat-alert">Repeat alert</label>
+                    <div class="hint">
+                        When the transaction type an operator picks was already logged for the
+                        same person at this organization, a warning appears beside Log
+                        Transaction. It does not stop the transaction being logged. Earlier
+                        records of the same type from other organizations are marked in the
+                        list but do not raise the warning.
+                    </div>
+                    <div class="repeat-window">
+                        <label for="repeat-alert-days">Count transactions from the last</label>
+                        <input type="number" id="repeat-alert-days" min="0" max="{{ max_repeat_alert_days }}"
+                               step="1" inputmode="numeric" value="{{ current_org.repeat_alert_days }}">
+                        <span>days</span>
+                    </div>
+                    <div class="hint" id="repeat-alert-hint">0 counts every earlier transaction, however old.</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="repeat-alert"
+                           {% if current_org.repeat_alert %}checked{% endif %}>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <button class="btn-add" id="btn-save-verification">Save</button>
+        </div>
+    </div>
+    {% comment %}
+    Read-only here: certificates are a site admin's to upload, on this
+    organization's Site page. Only where a signer is set up; with a key file
+    every organization signs the same way and there is nothing to say.
+    {% endcomment %}
+    {% if org_signing.mode == "signer" %}
+    {% include "includes/signing_org.html" with org=current_org upload=False %}
+    {% endif %}
+    </div>{# /.page-side #}
+
+    <div class="page-main">
+    <div class="card" id="users-card">
+        <h2 id="users-toggle" style="cursor:pointer; user-select:none; margin-bottom:0;">
+            <span id="users-arrow" style="display:inline-block; transition:transform 0.2s; margin-right:0.3rem;">&#9660;</span>
+            Administrators and Operators
+        </h2>
+
+        <div id="users-body">
+            <div style="margin-bottom:0.75rem;">
+                <input type="text" id="user-search" placeholder="Search by National ID, Digital ID, or Name..."
+                       style="width:100%; padding:0.6rem 0.75rem; font-size:0.9rem; border:1.5px solid #999; border-radius:4px; box-sizing:border-box;">
+            </div>
+
+            <!-- Add User Form -->
+            <div class="add-user-form">
+                <div class="form-group">
+                    <label for="add-card-number">National ID Card Number</label>
+                    <input type="text" id="add-card-number" placeholder="e.g. 1234-5678-9012-3456">
+                </div>
+                <div class="form-group">
+                    <label for="add-digital-id">Digital National ID (optional)</label>
+                    <input type="text" id="add-digital-id" placeholder="e.g. ABC1234" style="text-transform:uppercase;">
+                </div>
+                <div class="form-group">
+                    <label for="add-role">Role</label>
+                    <select id="add-role">
+                        <option value="operator">Operator</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <button class="btn-add" id="btn-add-user">Add</button>
+            </div>
+
+            <!-- Paging -->
+            <div id="users-paging" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; font-size:0.8rem; color:#666;">
+                <span id="paging-info"></span>
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <label for="page-size-select" style="font-size:0.8rem; margin:0; text-transform:none; letter-spacing:0;">Show:</label>
+                    <select id="page-size-select" style="padding:0.2rem 0.4rem; font-size:0.8rem; border:1px solid #999; border-radius:3px; width:auto;">
+                        <option value="5" selected>5</option>
+                        <option value="15">15</option>
+                        <option value="30">30</option>
+                        <option value="all">All</option>
+                    </select>
+                    <button id="page-prev" style="width:auto; padding:0.25rem 0.6rem; font-size:0.8rem; margin:0;" disabled>&laquo;</button>
+                    <button id="page-next" style="width:auto; padding:0.25rem 0.6rem; font-size:0.8rem; margin:0;">&#187;</button>
+                </div>
+            </div>
+
+            <ul class="user-list" id="users-list">
+                {% for m in memberships %}
+                <li class="user-item" data-user-id="{{ m.user.id }}">
+                    <div class="user-row1">
+                        <span class="user-name">{{ m.user.display_name|demo_name:demo_mode }}</span>
+                        <span class="user-actions">
+                            {% if m.user.id != user.id %}
+                            <select class="role-select" data-role-for="{{ m.user.id }}">
+                                <option value="operator" {% if m.role == 'operator' %}selected{% endif %}>Operator</option>
+                                <option value="admin" {% if m.role == 'admin' %}selected{% endif %}>Admin</option>
+                            </select>
+                            {# The ID travels as a data attribute, never inside script: text spliced into an onclick is compiled as JavaScript after the HTML parser has undone the escaping, and the page's CSP refuses inline handlers anyway (verify/csp.py). #}
+                            <button class="btn-remove" data-remove-user="{{ m.user.id }}" data-remove-label="{{ m.user.national_id_formatted|demo_id:demo_mode }}">Remove</button>
+                            {% else %}
+                            <span class="badge badge-admin">{{ m.get_role_display }} (You)</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="user-row2">
+                        <span><span class="label">Card:</span> <span class="id-val">{{ m.user.national_id_formatted|demo_id:demo_mode }}</span></span>
+                        {% if m.user.digital_national_id %}<span><span class="label">Digital:</span> <span class="id-val">{{ m.user.digital_national_id|demo_id:demo_mode }}</span></span>{% else %}<span class="id-warn" title="A sign-in is only attempted for a National ID this site already knows. Until this person has signed in once with their card number, the Digital National ID on the same card will not be recognised. Add it here to accept both.">Card number only</span>{% endif %}
+                        {% if m.user.last_login %}<span><span class="label">Login:</span> {{ m.user.last_login|date:"m/d/Y h:i A" }}</span>{% endif %}
+                    </div>
+                </li>
+                {% empty %}
+                <li style="text-align:center; color:#999; padding:1rem;">Nobody has been added to this organization yet.</li>
+                {% endfor %}
+            </ul>
+
+        </div>
+    </div>
+
+    <!-- Locations -->
+    <div class="card">
+        <h2 class="toggle-header" data-target="locations-body" style="cursor:pointer; user-select:none; margin-bottom:0;">
+            <span class="toggle-arrow" style="display:inline-block; transition:transform 0.2s; margin-right:0.3rem;">&#9660;</span>
+            Locations
+        </h2>
+        <div id="locations-body">
+            <div style="margin:0.75rem 0 0.5rem;">
+                <input type="text" id="loc-search" placeholder="Search locations..."
+                       style="width:100%; padding:0.5rem 0.6rem; font-size:0.85rem; border:1.5px solid #999; border-radius:4px; box-sizing:border-box;">
+            </div>
+            <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
+                <input type="text" id="add-location-name" placeholder="New location name..."
+                       style="flex:1; padding:0.5rem 0.6rem; font-size:0.85rem; border:1.5px solid #999; border-radius:4px;">
+                <button class="btn-add" id="btn-add-location" style="white-space:nowrap;">Add</button>
+            </div>
+            <div id="loc-paging" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem; font-size:0.8rem; color:#666;">
+                <span id="loc-paging-info"></span>
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <label style="font-size:0.8rem; margin:0; text-transform:none; letter-spacing:0;">Show:</label>
+                    <select id="loc-page-size" style="padding:0.2rem 0.4rem; font-size:0.8rem; border:1px solid #999; border-radius:3px; width:auto;">
+                        <option value="5" selected>5</option>
+                        <option value="15">15</option>
+                        <option value="30">30</option>
+                        <option value="all">All</option>
+                    </select>
+                    <button id="loc-prev" style="width:auto; padding:0.25rem 0.6rem; font-size:0.8rem; margin:0;" disabled>&laquo;</button>
+                    <button id="loc-next" style="width:auto; padding:0.25rem 0.6rem; font-size:0.8rem; margin:0;">&#187;</button>
+                </div>
+            </div>
+            <ul class="user-list" id="locations-list">
+                {% for loc in locations %}
+                <li class="user-item" data-id="{{ loc.id }}">
+                    <div class="user-row1">
+                        <span class="editable-name" contenteditable="true" data-original="{{ loc.name }}"
+                              data-edit-location="{{ loc.id }}"
+                              style="flex:1; min-width:0; outline:none; border-bottom:1px dashed transparent; cursor:text;"
+                              >{{ loc.name }}</span>
+                        <span class="loc-code" contenteditable="true" data-original="{{ loc.code }}"
+                              data-edit-location-code="{{ loc.id }}"
+                              title="Short code naming this location inside the offline credential in a document QR. Up to six letters or digits."
+                              style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:0.72rem; text-transform:uppercase; color:#66717c; border:1px dashed #cfd6dc; border-radius:3px; padding:0.05rem 0.3rem; min-width:3.2rem; text-align:center; outline:none; cursor:text;"
+                              >{{ loc.code }}</span>
+                        <button class="btn-remove" data-remove-location="{{ loc.id }}">Remove</button>
+                    </div>
+                </li>
+                {% empty %}
+                <li style="text-align:center; color:#999; padding:0.5rem;">No locations added.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <!-- Transaction Types -->
+    <div class="card">
+        <h2 class="toggle-header" data-target="tt-body" style="cursor:pointer; user-select:none; margin-bottom:0;">
+            <span class="toggle-arrow" style="display:inline-block; transition:transform 0.2s; margin-right:0.3rem;">&#9660;</span>
+            Transaction Types
+        </h2>
+        <div id="tt-body">
+            <div style="margin:0.75rem 0 0.5rem;">
+                <input type="text" id="tt-search" placeholder="Search transaction types..."
+                       style="width:100%; padding:0.5rem 0.6rem; font-size:0.85rem; border:1.5px solid #999; border-radius:4px; box-sizing:border-box;">
+            </div>
+            <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
+                <input type="text" id="add-tt-name" placeholder="New transaction type..."
+                       style="flex:1; padding:0.5rem 0.6rem; font-size:0.85rem; border:1.5px solid #999; border-radius:4px;">
+                <button class="btn-add" id="btn-add-tt" style="white-space:nowrap;">Add</button>
+            </div>
+            <div id="tt-paging" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem; font-size:0.8rem; color:#666;">
+                <span id="tt-paging-info"></span>
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <label style="font-size:0.8rem; margin:0; text-transform:none; letter-spacing:0;">Show:</label>
+                    <select id="tt-page-size" style="padding:0.2rem 0.4rem; font-size:0.8rem; border:1px solid #999; border-radius:3px; width:auto;">
+                        <option value="5" selected>5</option>
+                        <option value="15">15</option>
+                        <option value="30">30</option>
+                        <option value="all">All</option>
+                    </select>
+                    <button id="tt-prev" style="width:auto; padding:0.25rem 0.6rem; font-size:0.8rem; margin:0;" disabled>&laquo;</button>
+                    <button id="tt-next" style="width:auto; padding:0.25rem 0.6rem; font-size:0.8rem; margin:0;">&#187;</button>
+                </div>
+            </div>
+            <ul class="user-list" id="tt-list">
+                {% for tt in transaction_types %}
+                <li class="user-item" data-id="{{ tt.id }}">
+                    <div class="user-row1">
+                        <span class="editable-name" contenteditable="true" data-original="{{ tt.name }}"
+                              data-edit-tt="{{ tt.id }}"
+                              style="flex:1; min-width:0; outline:none; border-bottom:1px dashed transparent; cursor:text;"
+                              >{{ tt.name }}</span>
+                        <label class="tt-shared" title="Other organizations' User Records name this type. Unticked, they see that the person was verified here, and when, but not for what.">
+                            <input type="checkbox" data-shared-tt="{{ tt.id }}"
+                                   {% if tt.shared_in_user_records %}checked{% endif %}>
+                            Named to others
+                        </label>
+                        <button class="btn-remove" data-remove-tt="{{ tt.id }}">Remove</button>
+                    </div>
+                </li>
+                {% empty %}
+                <li style="text-align:center; color:#999; padding:0.5rem;">No transaction types added.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    </div>{# /.page-main #}
+    </div>{# /.page-cols #}
+
+    {% include "includes/branding_footer.html" %}
+</div>
+
+<!-- Confirm Remove Modal -->
+<div id="confirm-remove-overlay" class="modal-overlay hidden">
+    <div class="modal-box">
+        <h2 class="error">Remove from this organization</h2>
+        <p>Are you sure you want to remove <strong id="confirm-remove-id"></strong>?</p>
+        <div class="consent-buttons">
+            <button id="confirm-remove-cancel" class="btn-secondary">Cancel</button>
+            <button id="confirm-remove-ok" style="background-color:#dc3545;">Remove</button>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+(function() {
+    var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    var statusEl = document.getElementById('admin-status');
+
+    function showStatus(msg, isError) {
+        statusEl.textContent = msg;
+        statusEl.className = isError ? 'error' : 'success';
+        setTimeout(function() { statusEl.className = ''; statusEl.style.display = 'none'; }, 4000);
+    }
+
+    // --- Change Role ---
+    window.changeRole = function(selectEl, userId) {
+        var newRole = selectEl.value;
+        fetch('/app/admin/update-role/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ user_id: userId, role: newRole })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(resp) {
+            if (resp.status === 'ok') {
+                showStatus('Role updated to ' + newRole + '.', false);
+            } else {
+                showStatus(resp.message || 'Failed to update role.', true);
+                location.reload();
+            }
+        })
+        .catch(function() { showStatus('Network error.', true); location.reload(); });
+    };
+
+    // --- Add User ---
+    document.getElementById('btn-add-user').addEventListener('click', function() {
+        var cardNumber = document.getElementById('add-card-number').value.trim();
+        var digitalId = document.getElementById('add-digital-id').value.trim().toUpperCase();
+        var role = document.getElementById('add-role').value;
+
+        if (!cardNumber) {
+            showStatus('National ID Card Number is required.', true);
+            return;
+        }
+
+        this.disabled = true;
+        this.textContent = 'Adding...';
+        var btn = this;
+
+        fetch('/app/admin/add-user/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ digital_national_id: digitalId, national_id_card_number: cardNumber, role: role })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(resp) {
+            if (resp.status === 'ok') {
+                showStatus('User ' + digitalId + ' added successfully.', false);
+                setTimeout(function() { location.reload(); }, 800);
+            } else {
+                showStatus(resp.message || 'Failed to add user.', true);
+            }
+        })
+        .catch(function() { showStatus('Network error.', true); })
+        .finally(function() { btn.disabled = false; btn.textContent = 'Add User'; });
+    });
+
+    // --- Remove User ---
+    var removeUserId = null;
+    var confirmOverlay = document.getElementById('confirm-remove-overlay');
+
+    window.removeUser = function(userId, digitalId) {
+        removeUserId = userId;
+        document.getElementById('confirm-remove-id').textContent = digitalId;
+        confirmOverlay.classList.remove('hidden');
+    };
+
+    document.getElementById('confirm-remove-cancel').addEventListener('click', function() {
+        confirmOverlay.classList.add('hidden');
+        removeUserId = null;
+    });
+
+    document.getElementById('confirm-remove-ok').addEventListener('click', function() {
+        if (!removeUserId) return;
+        this.disabled = true;
+        this.textContent = 'Removing...';
+        var btn = this;
+
+        fetch('/app/admin/remove-user/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ user_id: removeUserId })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(resp) {
+            confirmOverlay.classList.add('hidden');
+            if (resp.status === 'ok') {
+                showStatus('User removed.', false);
+                var row = document.querySelector('.user-item[data-user-id="' + removeUserId + '"]');
+                if (row) row.remove();
+            } else {
+                showStatus(resp.message || 'Failed to remove user.', true);
+            }
+        })
+        .catch(function() { showStatus('Network error.', true); confirmOverlay.classList.add('hidden'); })
+        .finally(function() { btn.disabled = false; btn.textContent = 'Remove'; removeUserId = null; });
+    });
+
+    // --- Collapse Toggle ---
+    var usersBody = document.getElementById('users-body');
+    var usersArrow = document.getElementById('users-arrow');
+    document.getElementById('users-toggle').addEventListener('click', function() {
+        var collapsed = usersBody.style.display === 'none';
+        usersBody.style.display = collapsed ? '' : 'none';
+        usersArrow.style.transform = collapsed ? '' : 'rotate(-90deg)';
+    });
+
+    // --- Paging ---
+    var pageSize = 5;
+    var currentPage = 1;
+    var allRows = Array.from(document.querySelectorAll('.user-item[data-user-id]'));
+    var filteredRows = allRows.slice();
+    var pagePrev = document.getElementById('page-prev');
+    var pageNext = document.getElementById('page-next');
+    var pagingInfo = document.getElementById('paging-info');
+    var pageSizeSelect = document.getElementById('page-size-select');
+
+    function renderPage() {
+        var showAll = pageSize === 0;
+        var total = filteredRows.length;
+        var totalPages = showAll ? 1 : Math.max(1, Math.ceil(total / pageSize));
+        if (currentPage > totalPages) currentPage = totalPages;
+        var start = showAll ? 0 : (currentPage - 1) * pageSize;
+        var end = showAll ? total : start + pageSize;
+
+        allRows.forEach(function(r) { r.style.display = 'none'; });
+        filteredRows.forEach(function(r, i) {
+            r.style.display = (i >= start && i < end) ? '' : 'none';
+        });
+
+        pagingInfo.textContent = total === 0
+            ? 'No users found'
+            : 'Showing ' + (start + 1) + '-' + Math.min(end, total) + ' of ' + total;
+        pagePrev.disabled = currentPage <= 1;
+        pageNext.disabled = currentPage >= totalPages;
+    }
+
+    pagePrev.addEventListener('click', function() { currentPage--; renderPage(); });
+    pageNext.addEventListener('click', function() { currentPage++; renderPage(); });
+
+    pageSizeSelect.addEventListener('change', function() {
+        var val = this.value;
+        pageSize = val === 'all' ? 0 : parseInt(val, 10);
+        currentPage = 1;
+        renderPage();
+    });
+
+    renderPage();
+
+    // --- User Search (with paging reset, supports dashed/undashed) ---
+    document.getElementById('user-search').addEventListener('input', function() {
+        var q = this.value.toLowerCase().replace(/-/g, '');
+        filteredRows = allRows.filter(function(row) {
+            var text = row.textContent.toLowerCase().replace(/-/g, '');
+            return text.indexOf(q) >= 0;
+        });
+        currentPage = 1;
+        renderPage();
+    });
+
+    // --- Export date validation ---
+    var exportStart = document.getElementById('export-start');
+    var exportEnd = document.getElementById('export-end');
+    var btnExport = document.getElementById('btn-export');
+    function updateExportBtn() {
+        btnExport.disabled = !(exportStart.value && exportEnd.value);
+    }
+    exportStart.addEventListener('change', updateExportBtn);
+    exportEnd.addEventListener('change', updateExportBtn);
+
+    // --- Device log export: both dates, or neither ---
+    // The site page's rule, not the Transactions one above: on an audit
+    // trail everything held is an ordinary request, so only half a range
+    // is refused.
+    var logStart = document.getElementById('device-log-start');
+    var logEnd = document.getElementById('device-log-end');
+    var btnLogExport = document.getElementById('btn-device-log-export');
+    function updateLogExportBtn() {
+        btnLogExport.disabled = Boolean(logStart.value) !== Boolean(logEnd.value);
+    }
+    ['change', 'input'].forEach(function(name) {
+        logStart.addEventListener(name, updateLogExportBtn);
+        logEnd.addEventListener(name, updateLogExportBtn);
+    });
+    updateLogExportBtn();
+
+    // --- Statistics date filter ---
+    var statsStart = document.getElementById('stats-start');
+    var statsEnd = document.getElementById('stats-end');
+    var btnStatsFilter = document.getElementById('btn-stats-filter');
+    var btnStatsClear = document.getElementById('btn-stats-clear');
+
+    function fetchStats(start, end) {
+        var params = [];
+        if (start) params.push('start=' + start);
+        if (end) params.push('end=' + end);
+        var url = '{% url "admin_stats" %}' + (params.length ? '?' + params.join('&') : '');
+        fetch(url)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                document.getElementById('stat-users').textContent = data.total_users;
+                document.getElementById('stat-total').textContent = data.total_verifications;
+                document.getElementById('stat-success').textContent = data.successful_verifications;
+                document.getElementById('stat-failed').textContent = data.failed_verifications;
+            });
+    }
+
+    btnStatsFilter.addEventListener('click', function() {
+        fetchStats(statsStart.value, statsEnd.value);
+    });
+    btnStatsClear.addEventListener('click', function() {
+        statsStart.value = '';
+        statsEnd.value = '';
+        fetchStats('', '');
+    });
+
+    // --- Collapsible cards (generic) ---
+    document.querySelectorAll('.toggle-header').forEach(function(h2) {
+        h2.addEventListener('click', function() {
+            var body = document.getElementById(this.dataset.target);
+            var arrow = this.querySelector('.toggle-arrow');
+            var collapsed = body.style.display === 'none';
+            body.style.display = collapsed ? '' : 'none';
+            arrow.style.transform = collapsed ? '' : 'rotate(-90deg)';
+        });
+    });
+
+    // --- Reusable pager ---
+    function createPager(listId, searchId, pageSizeId, prevId, nextId, infoId) {
+        var allItems = Array.from(document.querySelectorAll('#' + listId + ' .user-item[data-id]'));
+        var filtered = allItems.slice();
+        var pageSize = 5;
+        var page = 1;
+
+        function render() {
+            var showAll = pageSize === 0;
+            var total = filtered.length;
+            var totalPages = showAll ? 1 : Math.max(1, Math.ceil(total / pageSize));
+            if (page > totalPages) page = totalPages;
+            var start = showAll ? 0 : (page - 1) * pageSize;
+            var end = showAll ? total : start + pageSize;
+            allItems.forEach(function(el) { el.style.display = 'none'; });
+            filtered.forEach(function(el, i) { el.style.display = (i >= start && i < end) ? '' : 'none'; });
+            document.getElementById(infoId).textContent = total === 0 ? 'No items' : 'Showing ' + (start + 1) + '-' + Math.min(end, total) + ' of ' + total;
+            document.getElementById(prevId).disabled = page <= 1;
+            document.getElementById(nextId).disabled = page >= totalPages;
+        }
+
+        document.getElementById(prevId).addEventListener('click', function() { page--; render(); });
+        document.getElementById(nextId).addEventListener('click', function() { page++; render(); });
+        document.getElementById(pageSizeId).addEventListener('change', function() {
+            var v = this.value; pageSize = v === 'all' ? 0 : parseInt(v, 10); page = 1; render();
+        });
+        document.getElementById(searchId).addEventListener('input', function() {
+            var q = this.value.toLowerCase();
+            filtered = allItems.filter(function(el) { return el.textContent.toLowerCase().indexOf(q) >= 0; });
+            page = 1; render();
+        });
+        render();
+    }
+
+    createPager('locations-list', 'loc-search', 'loc-page-size', 'loc-prev', 'loc-next', 'loc-paging-info');
+    createPager('tt-list', 'tt-search', 'tt-page-size', 'tt-prev', 'tt-next', 'tt-paging-info');
+
+    // The short code the offline credential names this desk by. Separate
+    // from the name on purpose: the name is a 255-character field and this
+    // rides a QR payload already at the limit of what a printed stamp can
+    // carry, so the credential carries six characters at most.
+    window.updateLocationCode = function(el, id) {
+        var code = el.textContent.trim().toUpperCase();
+        if (code === (el.dataset.original || '')) { return; }
+        fetch('{% url "admin_update_location" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ id: id, code: code })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(resp) {
+            if (resp.status === 'ok') {
+                el.dataset.original = code;
+                el.textContent = code;
+            } else {
+                el.textContent = el.dataset.original || '';
+                alert(resp.message);
+            }
+        })
+        .catch(function() { el.textContent = el.dataset.original || ''; });
+    };
+
+    // --- Locations CRUD ---
+    document.getElementById('btn-add-location').addEventListener('click', function() {
+        var input = document.getElementById('add-location-name');
+        var name = input.value.trim();
+        if (!name) return;
+        this.disabled = true;
+        var btn = this;
+        fetch('/app/admin/add-location/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ name: name })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(resp) {
+            if (resp.status === 'ok') {
+                showStatus(resp.message, false);
+                setTimeout(function() { location.reload(); }, 600);
+            } else {
+                showStatus(resp.message, true);
+            }
+        })
+        .catch(function() { showStatus('Network error.', true); })
+        .finally(function() { btn.disabled = false; });
+    });
+
+    window.updateLocation = function(el, id) {
+        var newName = el.textContent.trim();
+        var original = el.dataset.original;
+        if (newName === original || !newName) {
+            el.textContent = original;
+            el.style.borderBottomColor = 'transparent';
+            return;
+        }
+        fetch('/app/admin/update-location/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ id: id, name: newName })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(resp) {
+            if (resp.status === 'ok') {
+                el.dataset.original = newName;
+                showStatus('Location updated.', false);
+            } else {
+                el.textContent = original;
+                showStatus(resp.message, true);
+            }
+        })
+        .catch(function() { el.textContent = original; showStatus('Network error.', true); });
+        el.style.borderBottomColor = 'transparent';
+    };
+
+    window.removeLocation = function(id) {
+        if (!confirm('Remove this location?')) return;
+        fetch('/app/admin/remove-location/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ id: id })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(resp) {
+            if (resp.status === 'ok') {
+                var el = document.querySelector('#locations-list .user-item[data-id="' + id + '"]');
+                if (el) el.remove();
+                showStatus('Location removed.', false);
+            } else { showStatus(resp.message, true); }
+        })
+        .catch(function() { showStatus('Network error.', true); });
+    };
+
+    // --- Transaction Types CRUD ---
+    document.getElementById('btn-add-tt').addEventListener('click', function() {
+        var input = document.getElementById('add-tt-name');
+        var name = input.value.trim();
+        if (!name) return;
+        this.disabled = true;
+        var btn = this;
+        fetch('/app/admin/add-transaction-type/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ name: name })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(resp) {
+            if (resp.status === 'ok') {
+                showStatus(resp.message, false);
+                setTimeout(function() { location.reload(); }, 600);
+            } else {
+                showStatus(resp.message, true);
+            }
+        })
+        .catch(function() { showStatus('Network error.', true); })
+        .finally(function() { btn.disabled = false; });
+    });
+
+    window.updateTransactionType = function(el, id) {
+        var newName = el.textContent.trim();
+        var original = el.dataset.original;
+        if (newName === original || !newName) {
+            el.textContent = original;
+            el.style.borderBottomColor = 'transparent';
+            return;
+        }
+        fetch('/app/admin/update-transaction-type/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ id: id, name: newName })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(resp) {
+            if (resp.status === 'ok') {
+                el.dataset.original = newName;
+                showStatus('Transaction type updated.', false);
+            } else {
+                el.textContent = original;
+                showStatus(resp.message, true);
+            }
+        })
+        .catch(function() { el.textContent = original; showStatus('Network error.', true); });
+        el.style.borderBottomColor = 'transparent';
+    };
+
+    // Whether other organizations' User Records name this type. The box
+    // goes back if the server refuses.
+    function shareTransactionType(box, id) {
+        var wanted = box.checked;
+        fetch('/app/admin/update-transaction-type/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ id: id, shared_in_user_records: wanted })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(resp) {
+            if (resp.status === 'ok') {
+                showStatus(wanted ? 'Other organizations see this type.'
+                                  : 'Other organizations no longer see this type.', false);
+            } else {
+                box.checked = !wanted;
+                showStatus(resp.message, true);
+            }
+        })
+        .catch(function() { box.checked = !wanted; showStatus('Network error.', true); });
+    }
+
+    window.removeTransactionType = function(id) {
+        if (!confirm('Remove this transaction type?')) return;
+        fetch('/app/admin/remove-transaction-type/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ id: id })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(resp) {
+            if (resp.status === 'ok') {
+                var el = document.querySelector('#tt-list .user-item[data-id="' + id + '"]');
+                if (el) el.remove();
+                showStatus('Transaction type removed.', false);
+            } else { showStatus(resp.message, true); }
+        })
+        .catch(function() { showStatus('Network error.', true); });
+    };
+
+    // --- In place of inline handlers on the rows -----------------------
+    // The page's Content-Security-Policy refuses on* attributes, so each row
+    // names its record in a data attribute and these few listeners, on the
+    // whole document, call the functions above. focusout is blur that bubbles.
+    function idOf(el, key) { return Number(el.dataset[key]); }
+    document.addEventListener('change', function(event) {
+        var el = event.target.closest('[data-role-for]');
+        if (el) { changeRole(el, idOf(el, 'roleFor')); }
+        var shared = event.target.closest('[data-shared-tt]');
+        if (shared) { shareTransactionType(shared, idOf(shared, 'sharedTt')); }
+    });
+    document.addEventListener('click', function(event) {
+        var el = event.target.closest('[data-remove-user], [data-remove-location], [data-remove-tt]');
+        if (!el) { return; }
+        if (el.dataset.removeUser) { removeUser(idOf(el, 'removeUser'), el.dataset.removeLabel); }
+        else if (el.dataset.removeLocation) { removeLocation(idOf(el, 'removeLocation')); }
+        else { removeTransactionType(idOf(el, 'removeTt')); }
+    });
+    document.addEventListener('focusin', function(event) {
+        var el = event.target;
+        if (el.dataset.editLocation || el.dataset.editTt) { el.style.borderBottomColor = '#999'; }
+        else if (el.dataset.editLocationCode) { el.style.borderColor = 'var(--primary-color)'; }
+    });
+    document.addEventListener('focusout', function(event) {
+        var el = event.target;
+        if (el.dataset.editLocation) { updateLocation(el, idOf(el, 'editLocation')); }
+        else if (el.dataset.editLocationCode) { updateLocationCode(el, idOf(el, 'editLocationCode')); }
+        else if (el.dataset.editTt) { updateTransactionType(el, idOf(el, 'editTt')); }
+    });
+
+    // --- Organization profile -------------------------------------------
+    // The logo is read in the browser and posted as a data URI. The server
+    // re-validates it against the real magic bytes; nothing here is trusted.
+    var pendingLogo = null;
+
+    var logoFile = document.getElementById('logo-file');
+    if (logoFile) {
+        logoFile.addEventListener('change', function() {
+            var file = this.files && this.files[0];
+            if (!file) { return; }
+            if (file.size > 256 * 1024) {
+                showStatus('Logo must be 256 KB or smaller.', true);
+                this.value = '';
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function() {
+                pendingLogo = reader.result;
+                document.getElementById('logo-preview').innerHTML =
+                    '<img class="org-logo" src="' + pendingLogo +
+                    '" alt="" style="max-height:64px; max-width:140px; border-radius:8px;">';
+                showStatus('Logo ready. Save the profile to keep it.', false);
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    var clearLogoBtn = document.getElementById('btn-clear-logo');
+    if (clearLogoBtn) {
+        clearLogoBtn.addEventListener('click', function() {
+            pendingLogo = '';
+            var color = document.getElementById('org-color').value;
+            var name = document.getElementById('org-name').value.trim() || '?';
+            var words = name.split(/[\s-]+/).filter(Boolean);
+            var initials = (words.length > 1
+                ? words.slice(0, 3).map(function(w) { return w[0]; }).join('')
+                : words[0].slice(0, 3)).toUpperCase();
+            document.getElementById('logo-preview').innerHTML =
+                '<span class="org-mark lg" style="background:' + color + ';">' + initials + '</span>';
+            showStatus('Logo cleared. Save the profile to apply it.', false);
+        });
+    }
+
+    var saveProfileBtn = document.getElementById('btn-save-profile');
+    if (saveProfileBtn) {
+        saveProfileBtn.addEventListener('click', function() {
+            var btn = this;
+            var payload = {
+                name: document.getElementById('org-name').value.trim(),
+                subtitle: document.getElementById('org-subtitle').value.trim(),
+                mark_color: document.getElementById('org-color').value
+            };
+            // Only send the logo when it actually changed, so saving the name
+            // does not round-trip the whole image.
+            if (pendingLogo !== null) { payload.logo_data = pendingLogo; }
+            btn.disabled = true;
+            fetch('/app/admin/profile/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify(payload)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                btn.disabled = false;
+                if (resp.status === 'ok') {
+                    showStatus(resp.message, false);
+                    setTimeout(function() { location.reload(); }, 600);
+                } else { showStatus(resp.message, true); }
+            })
+            .catch(function() { btn.disabled = false; showStatus('Network error.', true); });
+        });
+    }
+
+    // --- Verification: Check User Records and its repeat alert ------------
+    var saveVerificationBtn = document.getElementById('btn-save-verification');
+    var checkRecords = document.getElementById('check-user-records');
+    var repeatAlert = document.getElementById('repeat-alert');
+    var repeatDays = document.getElementById('repeat-alert-days');
+    var repeatRow = document.getElementById('repeat-alert-row');
+
+    // The alert is part of User Records: greyed out while the list is off,
+    // and the window greyed out while the alert is. Disabled controls are
+    // still read and saved, so turning the list off forgets nothing.
+    function syncRepeatAlert() {
+        if (!repeatRow) { return; }
+        var listOn = checkRecords.checked;
+        repeatRow.classList.toggle('is-off', !listOn);
+        repeatAlert.disabled = !listOn;
+        repeatDays.disabled = !listOn || !repeatAlert.checked;
+    }
+    if (checkRecords && repeatAlert) {
+        checkRecords.addEventListener('change', syncRepeatAlert);
+        repeatAlert.addEventListener('change', syncRepeatAlert);
+        syncRepeatAlert();
+    }
+
+    if (saveVerificationBtn) {
+        saveVerificationBtn.addEventListener('click', function() {
+            var btn = this;
+            var body = { check_user_records: checkRecords.checked };
+            if (repeatAlert) {
+                var raw = repeatDays.value.trim();
+                var days = /^\d+$/.test(raw) ? parseInt(raw, 10) : NaN;
+                var most = parseInt(repeatDays.max, 10);
+                if (isNaN(days) || days > most) {
+                    showStatus('Enter the repeat alert window as a whole number of days from 0 to ' + most + '.', true);
+                    repeatDays.focus();
+                    return;
+                }
+                body.repeat_alert = repeatAlert.checked;
+                body.repeat_alert_days = days;
+            }
+            btn.disabled = true;
+            fetch('/app/admin/verification/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify(body)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                btn.disabled = false;
+                showStatus(resp.message || 'Could not save.', resp.status !== 'ok');
+            })
+            .catch(function() { btn.disabled = false; showStatus('Network error.', true); });
+        });
+    }
+
+    // --- eVerify credentials ---------------------------------------------
+    var saveEverifyBtn = document.getElementById('btn-save-everify');
+    if (saveEverifyBtn) {
+        saveEverifyBtn.addEventListener('click', function() {
+            var btn = this;
+            function checked(id) {
+                var el = document.getElementById(id);
+                return !!(el && el.checked);
+            }
+            btn.disabled = true;
+            fetch('/app/admin/everify/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({
+                    everify_client_id: document.getElementById('ev-client-id').value.trim(),
+                    everify_client_secret: document.getElementById('ev-client-secret').value,
+                    everify_public_api_key: document.getElementById('ev-public-key').value,
+                    clear_secret: checked('ev-clear-secret'),
+                    clear_public_key: checked('ev-clear-public-key')
+                })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                btn.disabled = false;
+                if (resp.status === 'ok') {
+                    showStatus(resp.message, false);
+                    setTimeout(function() { location.reload(); }, 600);
+                } else { showStatus(resp.message, true); }
+            })
+            .catch(function() { btn.disabled = false; showStatus('Network error.', true); });
+        });
+    }
+})();
+</script>
+{% endblock %}

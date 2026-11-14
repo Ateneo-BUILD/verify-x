@@ -1,0 +1,118 @@
+# /etc/cl03-signer/policy.toml -- owned by root, read by cl03-signer.
+# Nothing here comes from verify: a value verify could set is a value an
+# application compromise could set.
+#
+# install.sh puts this file in place when there is none. Every value below
+# is an example: the signer will not start until the anchors exist, and
+# `python -m signer check --config /etc/cl03-signer/policy.toml` says what is
+# still wrong. A name the signer does not read stops it too, so a misspelt
+# one is never a default nobody chose.
+
+credential_max_days = 365        # V; must equal verify's CREDENTIAL_MAX_VALIDITY_DAYS
+margin_seconds = 2592000         # M, 30 days
+lease_seconds = 2592000          # verify's DEVICE_LEASE_SECONDS, at most 31 days
+revocation_ttl_seconds = 86400   # verify's CREDENTIAL_REVOCATION_TTL_SECONDS
+statement_days = 90
+min_signing_days = 90
+
+# Revocations from verify: at most this many new ids are taken a call, the
+# rest at the next calls, and a high alert says so; no bundle or feed is
+# signed until the whole set is in. More than revocation_alert_per_day added
+# in a day is a high alert too.
+# revocation_growth_per_call = 10000
+# revocation_alert_per_day = 1000
+
+# The host phones pair with, which its own HTTPS certificate names. The
+# Organization CA is this site's System CA, "<site_domain> System CA", and
+# lists it; phones trust what it certifies only for this site (README.md,
+# "The System CA's domain"). Needed for `cl03signer ca keygen`.
+# site_domain = "verify.example.ph"
+
+# A site admin publishes an organization's key and starts it signing from
+# verify, with no operator here (README.md, "Publishing from the site").
+# Off unless set.
+# site_publishes_organization_keys = true
+
+# Every key action from verify, by any site admin alone: publish and start
+# the deployment's keys too, unsuspend, resume, and withdraw any key at once
+# (README.md, "Every key from the site"). A compromised app can then stop
+# every phone's sync. Off unless set; for a site that has decided so.
+# site_controls_all_keys = true
+
+# The pinned issuing CA(s), DER. The same certificate the app pins.
+anchors = ["/etc/cl03-signer/issuing-ca.der"]
+
+# Raw keys the signer does not hold, listed for credentials they signed:
+# for example key 1, a development key, with its IssuerKey's window.
+# A legacy or held key's window is read at the first start and never
+# changed from here: a later edit stops the signer until it is put back
+# (README.md, "When it will not start"). End one early with
+# `cl03signer legacy-end` or `retire`.
+# [[legacy]]
+# key_id = 1
+# spki = "<base64 DER SubjectPublicKeyInfo>"
+# not_before = 1755500000
+# not_after = 1818572000
+
+# Or, on a development site whose phones still run an app that pins only
+# key 1: the signer HOLDS key 1 and signs with it (never both [[legacy]] and
+# [[held]] for one id). The file is in `keys` below, mode 0600, owned by
+# cl03-signer; `spki` is its pin. Seeded as published; `cl03signer activate 1`
+# makes it sign.
+# [[held]]
+# key_id = 1
+# key_file = "key-1.pem"
+# spki = "<base64 DER SubjectPublicKeyInfo>"
+# not_before = 1755500000
+# signing_until = 1818572000
+
+# Ceilings override the defaults in signer/config.py. An entry names a
+# ceiling the signer counts there (context and principal), changes the
+# windows it gives, whole numbers unquoted, and keeps the default for the
+# others. Keep every principal cap below the global cap in every window.
+# [[ceilings]]
+# context = "credential"
+# principal = "operator"
+# per_minute = 10
+# per_hour = 120
+# per_day = 600
+
+[runtime]
+site = "verify"                  # this site's name in alerts and the ledger
+db = "/var/lib/cl03-signer/signer.db"
+keys = "/var/lib/cl03-signer/keys"
+app_socket = "/run/cl03-signer/app.sock"
+admin_socket = "/run/cl03-signer/admin.sock"
+# The user gunicorn runs as, the one install.sh was given
+# (`sh install.sh verify-app`). Only it may use the app socket. It must be a
+# user without sudo, or an application bug is root and this separation
+# protects nothing (README.md, "Before the signer protects anything").
+app_user = "verify-app"
+app_group = "cl03-signer-app"      # the app socket's group (install.sh)
+operators_group = "cl03-operators"
+# How verify reaches the signer. "socket", the default: the app socket above,
+# on the app's own host. "poll": no app runs here; the signer dials out to
+# site_url (https) and long-polls it for jobs, with the site's
+# SIGNER_QUEUE_KEY as the credential poll-key (README.md, "Poll mode").
+# app_socket and app_user are then not read; the admin socket stays.
+# The site serves /api/v1/signer/ from a gunicorn pool of its own, and
+# site_url's host is in every MAC (README.md, "Poll mode").
+# transport = "poll"
+# site_url = "https://verify.example.ph"
+# A development site with no AWS sets `ledger_dir` instead of the five AWS
+# names below (README.md, "A development site"):
+# ledger_dir = "/var/lib/cl03-signer/ledger"
+aws_region = "ap-southeast-1"
+ledger_bucket = "example-signer-ledger"
+ledger_prefix = "verify"
+sns_topic = "arn:aws:sns:ap-southeast-1:ACCOUNT:cl03-signer-alerts"
+metric_namespace = "CL03Signer"
+ship_every_seconds = 300
+# Days each shipped ledger object stays locked (Object Lock, compliance
+# mode): 400 unless set, at least 1. Objects already shipped keep theirs.
+# Keep the bucket's default the same.
+# ledger_retain_days = 400
+report_url = "http://127.0.0.1:8000/api/v1/signer/report/"
+report_host = "verify.example.ph"   # the site's own host name
+# In poll mode leave both out: the report is read from
+# <site_url>/api/v1/signer/report/ over https, as the site names itself.

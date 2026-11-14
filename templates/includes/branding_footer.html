@@ -1,0 +1,20 @@
+{% load static %}
+{% comment %}
+The deployment's own logos, from SITE_FOOTER_LOGOS and BRANDING_DIR (see
+verify/branding.py). None configured, no footer: this repository names no
+organization on anybody's site.
+{% endcomment %}
+{% if footer_logos %}
+<div class="branding-footer">
+    {% if footer_label %}<div class="developer-label">{{ footer_label }}</div>{% endif %}
+    <div class="logo-container">
+        {% for logo in footer_logos %}
+        {% if logo.href %}
+        <a href="{{ logo.href }}" target="_blank" rel="noopener"><img src="{% static logo.src %}" alt="{{ logo.alt }}"></a>
+        {% else %}
+        <img src="{% static logo.src %}" alt="{{ logo.alt }}">
+        {% endif %}
+        {% endfor %}
+    </div>
+</div>
+{% endif %}

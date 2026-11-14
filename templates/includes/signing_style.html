@@ -1,0 +1,77 @@
+{% comment %}
+Shared by the Credential signing card on Setup and the Credential signing
+section of an organization's pages (includes/signing_setup.html,
+includes/signing_org.html): the state pills, the key table and the facts list.
+{% endcomment %}
+<style>
+    .sg-stats { display: flex; gap: 1.3rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1rem; }
+    .sg-stat .n { font-size: 1.25rem; font-weight: 700; color: #00529B; font-variant-numeric: tabular-nums; line-height: 1.15; }
+    .sg-stat .n.ok { color: #1b7f4b; }
+    .sg-stat .n.bad { color: #b3261e; }
+    .sg-stat .n small { font-size: 0.8rem; color: #6b7a89; font-weight: 600; }
+    .sg-stat .l { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7a89; }
+    .sg-push { margin-left: auto; }
+    .sg-push form { margin: 0; }
+    .container .sg-stop {
+        width: auto; margin: 0; padding: 0.45rem 0.85rem; font-size: 0.82rem;
+        background: #fff; color: #b3261e; border: 1px solid #d9a5a1;
+    }
+    .container .sg-stop:hover { background: #fdeceb; }
+    .sg-scroll { overflow-x: auto; }
+    .sg-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .sg-table th {
+        text-align: left; font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.06em;
+        color: #6b7a89; font-weight: 700; border-bottom: 1px solid var(--border-color);
+        padding: 0.4rem 0.5rem; white-space: nowrap;
+    }
+    .sg-table td { padding: 0.5rem; border-bottom: 1px solid #eef1f4; vertical-align: top; }
+    .sg-table td.kid { font-weight: 700; color: var(--secondary-color); font-variant-numeric: tabular-nums; }
+    .sg-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .sg-sub { display: block; color: #7a8794; font-size: 0.72rem; }
+    .sg-warn { color: #8a5a00; font-weight: 600; }
+    .sg-pill { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
+    .sg-active { background: #e3f3e8; color: #1b6e35; }
+    .sg-published { background: #e3eefa; color: #00529B; }
+    .sg-generated { background: #fff2d9; color: #7d5200; }
+    .sg-suspended { background: #fdeceb; color: #a8231b; }
+    .sg-retired { background: #eef1f4; color: #55626e; }
+    .sg-table code, .sg-facts code, .sg-hint code {
+        font-size: 0.74rem; background: #eef1f4; padding: 1px 4px; border-radius: 3px; color: #2b3a48;
+    }
+    .sg-inline { display: inline; margin: 0; }
+    .container .sg-inline button {
+        width: auto; margin: 0; padding: 0; border: 0; background: none;
+        font-size: 0.75rem; text-decoration: underline; cursor: pointer; color: #b3261e;
+    }
+    .container .sg-inline button:hover { background: none; color: #8c1d18; }
+    .sg-upload { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.4rem; }
+    .sg-upload input[type=file] { flex: 1 1 14rem; font-size: 0.78rem; width: auto; padding: 0.25rem; }
+    .container .sg-upload button { width: auto; margin: 0; padding: 0.35rem 0.75rem; font-size: 0.8rem; }
+    .sg-facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0 0 0.6rem; font-size: 0.85rem; }
+    .sg-facts dt { color: #6b7a89; }
+    .sg-facts dd { margin: 0; }
+    .sg-hint { color: #666; font-size: 0.8rem; margin-top: 0.5rem; }
+    /* An organization's next certificate */
+    .sg-next { border-top: 1px solid var(--border-color); margin-top: 0.9rem; padding-top: 0.85rem; display: grid; gap: 0.6rem; }
+    .sg-next h4 { margin: 0; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: #6b7a89; }
+    .sg-names { font-size: 0.8rem; background: #f7f9fb; border: 1px solid #e6ebf0; border-radius: 5px; padding: 0.45rem 0.65rem; overflow-wrap: anywhere; }
+    .sg-names code { font-size: 0.74rem; background: #eef1f4; padding: 1px 4px; border-radius: 3px; color: #2b3a48; }
+    .sg-way { display: grid; grid-template-columns: 11.5rem 1fr; gap: 0.2rem 0.8rem; align-items: start; margin: 0; }
+    .sg-way .sg-hint { margin: 0; padding-top: 0.25rem; }
+    .container .sg-way button { width: 100%; margin: 0; padding: 0.45rem 0.85rem; font-size: 0.82rem; }
+    .container .sg-way button.sg-ghost { background: #fff; color: #00529B; border: 1px solid #a9c3dd; }
+    .container .sg-way button.sg-ghost:hover { background: #f2f7fc; }
+    .container .sg-way button[disabled] { background: #e6eaee; color: #8a96a2; border: 0; cursor: not-allowed; }
+    .sg-acts { display: flex; flex-wrap: wrap; gap: 0.5rem 0.8rem; align-items: center; }
+    .sg-acts .sg-hint { margin: 0; }
+    .sg-link { font-size: 0.8rem; }
+    .sg-ca { display: grid; grid-template-columns: auto 1fr auto; gap: 0.3rem 1rem; align-items: start; border: 1px solid var(--border-color); border-radius: 6px; padding: 0.65rem 0.8rem; margin-bottom: 0.9rem; background: #fbfcfd; }
+    .sg-ca .t { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.07em; color: #6b7a89; font-weight: 700; padding-top: 0.15rem; }
+    .sg-ca .who { font-weight: 700; font-size: 0.86rem; }
+    .sg-ca .end { text-align: right; }
+    @media (max-width: 640px) {
+        .sg-way { grid-template-columns: 1fr; }
+        .sg-ca { grid-template-columns: 1fr; }
+        .sg-ca .end { text-align: left; }
+    }
+</style>

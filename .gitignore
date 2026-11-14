@@ -1,0 +1,81 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+dbbackup/
+media/
+staticfiles/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment variables
+.env
+
+# Issuer signing keys. The real one lives OUTSIDE this directory so that
+# deploy.sh's `rsync --delete` cannot touch it and it never rides the off-site
+# database backups of db.sqlite3; this is a guard against a development key
+# being committed by accident.
+*.pem
+
+# Distribution
+dist/
+build/
+*.egg-info/
+*.egg
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Deploy secrets
+deploy/*.pem
+deploy/*.key
+
+# Any other key or certificate format, anywhere. The Apple Wallet pass
+# certificate and the issuer key live outside the tree on a server;
+# these stop a local copy being committed while working on them.
+*.key
+*.p12
+*.pfx
+*.pkpass
+secrets/
+
+# One deployment's settings and state. They belong in a private folder
+# outside this repository (docs/deploy-aws.md); these stop a copy made here
+# by mistake from being committed. Terraform state holds account ids and
+# resource ARNs, and a plan file can hold anything the plan read.
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+terraform.tfstate.d/
+*.tfvars
+!*.tfvars.example
+tfplan*
+*.tfplan
+site/
+site.conf
+*.site.conf
+deploy/*.conf
+backups/
+deploy/*.env
+
+# Working reference material (meeting decks and the like). Not source, and
+# deploy.sh rsyncs this tree to the server.
+references/

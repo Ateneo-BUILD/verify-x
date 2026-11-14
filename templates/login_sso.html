@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% comment %}
+The login page when the site's login method is single sign-on.
+Deliberately a separate template rather than branches through login.html:
+the eVerify page
+carries the liveness SDK, the QR scanner and a 400-line initApp() that all
+belong to the other flow, and threading conditionals through it would put
+both flows one typo away from each other.
+
+The identity check itself happens at the provider, which runs eVerify and
+liveness on its side. This page collects nothing: which organization and
+location the operator is working for is asked on /choose/ afterwards, where
+the app knows who they are and therefore what to offer.
+{% endcomment %}
+
+{% block title %}{{ site_title }}: Login{% endblock %}
+
+{% block extra_head %}
+<style>
+    .sso-card { max-width: 460px; margin: 0 auto; }
+    .sso-provider {
+        font-size: 0.8rem;
+        color: #777;
+        text-align: center;
+        margin-top: 1rem;
+    }
+    .sso-note {
+        background: #f4f7f9;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 0.75rem 0.9rem;
+        font-size: 0.85rem;
+        color: #555;
+        margin-bottom: 1.25rem;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container container--narrow">
+
+    <div class="branding-header">
+        <img src="{% static 'nationalid-everify-logo.png' %}" alt="National ID eVerify">
+    </div>
+
+    <h1>Login with National ID</h1>
+
+    <div class="card sso-card">
+        {% if error %}
+        <div class="status-box error" style="margin-bottom:1rem;">{{ error }}</div>
+        {% endif %}
+
+        <div class="sso-note">
+            You will be taken to the National ID sign-in service to verify your
+            identity, then returned here. Only registered operators can sign in.
+        </div>
+
+        <form method="post" action="{% url 'sso_login' %}" autocomplete="off">
+            {% csrf_token %}
+            <button type="submit" id="sso-btn">Sign in with National ID</button>
+        </form>
+
+        <div class="sso-provider">Verified by {{ sso_issuer_host }}</div>
+    </div>
+
+    {% include "includes/branding_footer.html" %}
+</div>
+{% endblock %}

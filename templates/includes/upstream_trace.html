@@ -1,0 +1,57 @@
+{% comment %}
+The upstream call trace: what the app asked eVerify and what came back.
+
+Included by the two pages that call /everify/ -- the login page and the
+Verify page -- so there is ONE renderer rather than two that can disagree.
+The server sends a trace only on a debugging instance (accounts/debug_store.py
+decides); everywhere else `trace` is absent and this draws nothing.
+
+Everything is written with textContent. The lines are response bodies from a
+service this app does not control, and the Verify page's own showStatus()
+writes innerHTML -- which is exactly why the trace is rendered here instead
+of being folded into the status message.
+{% endcomment %}
+<style>
+    .err-trace { margin-top: 1rem; text-align: left; }
+    .err-trace summary {
+        cursor: pointer; font-size: 0.8rem; font-weight: 600;
+        color: #00529B; letter-spacing: 0.02em;
+    }
+    .err-trace summary:focus-visible { outline: 2px solid #00529B; outline-offset: 2px; }
+    .err-trace ol {
+        margin: 0.75rem 0 0; padding-left: 1.2rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.72rem; line-height: 1.5; color: #444;
+    }
+    .err-trace li { margin-bottom: 0.6rem; }
+    .err-trace-head { font-weight: 700; color: #16202b; }
+    .err-trace-line { word-break: break-all; color: #6b7a89; }
+</style>
+<script nonce="{{ csp_nonce }}">
+    function renderUpstreamTrace(box, list, trace) {
+        if (!box || !list) { return; }
+        list.textContent = '';
+        if (!trace || !trace.length) { box.hidden = true; return; }
+        trace.forEach(function (step) {
+            var li = document.createElement('li');
+            var head = document.createElement('div');
+            head.className = 'err-trace-head';
+            var bits = [step.step];
+            if (step.status) { bits.push('HTTP ' + step.status); }
+            if (typeof step.ms === 'number') { bits.push(step.ms + ' ms'); }
+            head.textContent = bits.join('  ·  ');
+            li.appendChild(head);
+            [step.detail,
+             (step.method && step.url) ? step.method + ' ' + step.url : step.url,
+             step.body].forEach(function (line) {
+                if (!line) { return; }
+                var row = document.createElement('div');
+                row.className = 'err-trace-line';
+                row.textContent = line;
+                li.appendChild(row);
+            });
+            list.appendChild(li);
+        });
+        box.hidden = false;
+    }
+</script>

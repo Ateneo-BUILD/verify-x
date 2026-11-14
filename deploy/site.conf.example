@@ -1,0 +1,317 @@
+# One Verify site's settings, all in one file: the AWS account and domain,
+# the SSH key, the eVerify credentials, Django's secrets and every optional
+# feature. deploy/deploy.sh reads it to build the AWS resources (with
+# Terraform) and on every deploy, when it writes the server's .env from it.
+#
+# A site shares nothing with any other deployment of Verify: it has its own
+# AWS account, its own network, its own domain and certificate, its own
+# eVerify credentials and its own database. Nothing here defaults to
+# another site's values, and the tools refuse to use AWS credentials that
+# belong to any account but the one named below.
+#
+# This file holds secrets. Copy it OUT of the repository, into a private
+# folder of its own, and keep that folder backed up:
+#
+#   verify-site/
+#     site.conf             this file, filled in
+#     keys/verify, .pub     the SSH key (ssh-keygen -t ed25519 -f keys/verify)
+#     secrets/              issuer and Apple Wallet PEMs, if used
+#     terraform.tfstate     written by `deploy.sh infra`; keep it with the rest
+#
+# Then, from the repository:
+#
+#   export VERIFY_SITE=../verify-site/site.conf
+#   deploy/deploy.sh infra        # build the AWS resources
+#   deploy/deploy.sh              # deploy the application
+#
+# Format: KEY=value, one per line. No quotes, no spaces around "=". A
+# comment goes on a line of its own, so a value may contain "#". Relative
+# paths are relative to this file. An unknown key is refused rather than
+# ignored, so a typo cannot quietly fall back to a default. Leave a key
+# empty, or commented out, to keep the default shown.
+
+# =============================================================================
+# The site
+# =============================================================================
+
+# Short name, unique in the AWS account: lower-case letters, digits and
+# hyphens. Names every AWS resource. Choose it once: renaming rebuilds.
+SITE_NAME=verify
+
+# The public host name operators will use.
+DOMAIN=verify.example.org
+
+# =============================================================================
+# AWS: an account of the site's own
+# =============================================================================
+# Use an AWS account that holds nothing else, so this site cannot touch, or
+# be touched by, anything another deployment runs. Every AWS action is
+# checked against AWS_ACCOUNT_ID first, and Terraform itself refuses any
+# other account.
+AWS_ACCOUNT_ID=
+AWS_REGION=
+
+# The site's credentials, of an IAM user (or role) in that account allowed to
+# build what docs/deploy-aws.md lists. Either access keys here, which keeps
+# everything in this one file...
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+# ...or the name of a profile in the AWS CLI's configuration on this machine,
+# such as one signed in through IAM Identity Center. Not both. With neither,
+# the tools stop: they never fall back to this machine's default
+# credentials, which may belong to another account.
+# AWS_PROFILE=
+
+# Who may reach the bastion over SSH: comma-separated CIDR ranges, such as
+# your office's public address as a /32.
+SSH_ALLOWED_CIDRS=203.0.113.10/32
+
+# The SSH key deploys use. The public half is installed on the servers.
+SSH_PUBLIC_KEY_FILE=keys/verify.pub
+SSH_PRIVATE_KEY_FILE=keys/verify
+
+# The site's TLS certificate. With a Route 53 hosted zone for the domain,
+# validation and the site's DNS record are automatic. Without one,
+# `deploy.sh infra certificate` prints the record to create. Or name an
+# issued ACM certificate you already have, in this region.
+# ROUTE53_ZONE_ID=
+# CERTIFICATE_ARN=
+
+# INSTANCE_TYPE=t3.micro
+# BASTION_INSTANCE_TYPE=t3.nano
+# VPC_CIDR=10.20.0.0/16
+# ROOT_VOLUME_GB=30
+# SNAPSHOT_RETENTION_DAYS=7
+
+# =============================================================================
+# Django
+# =============================================================================
+
+# A long random string, unique to this site. Generate one with
+#   python -c "import secrets; print(secrets.token_urlsafe(64))"
+# The site refuses to start without it.
+DJANGO_SECRET_KEY=
+
+# Keys the hash User Records finds a person's transactions by. Blank uses
+# DJANGO_SECRET_KEY. Changing it later orphans every key already written, so
+# set it once, before DJANGO_SECRET_KEY is ever rotated. Generate one with
+#   python -c "import secrets; print(secrets.token_urlsafe(64))"
+# USER_RECORDS_KEY=
+
+# The first superuser, for the Django admin at /admin/. Created on the
+# server's first deploy only; empty the password once the account exists.
+DJANGO_SUPERUSER_USERNAME=admin
+DJANGO_SUPERUSER_EMAIL=admin@example.org
+DJANGO_SUPERUSER_PASSWORD=
+
+# Defaults to DOMAIN; the deploy also adds the server's private address,
+# where the load balancer's health checks arrive. Never True on a server.
+# DJANGO_ALLOWED_HOSTS=
+# DJANGO_DEBUG=False
+
+# =============================================================================
+# eVerify: the client that signs operators in
+# =============================================================================
+# Issued by PSA to THIS site. Never reuse another deployment's client: its
+# usage would be billed to, and logged against, somebody else. These apply until a site administrator saves a client on the
+# Setup page, which then takes precedence. Each organization's VERIFICATION
+# client is entered on that organization's own page in the application (its
+# address by a site administrator, on the Site page), and deliberately never
+# falls back to these.
+EVERIFY_CLIENT_ID=
+EVERIFY_CLIENT_SECRET=
+EVERIFY_PUBLIC_API_KEY=
+# EVERIFY_BASE_URL=https://ws.everify.gov.ph/api
+# The only hosts any eVerify address may name, comma-separated. Whatever
+# answers there decides who a verified person is, so no page can widen this.
+# Change it only to point a test site at a stub.
+# EVERIFY_ALLOWED_HOSTS=ws.everify.gov.ph
+# The hosts eVerify's portrait links may name, comma-separated. Empty allows
+# any host that resolves only to public addresses; loopback, the private
+# network and the cloud metadata service are refused whatever this says. The
+# first fetch from each host is logged: name it here to allow only that.
+# EVERIFY_FACE_HOSTS=
+
+# The single sign-on issuers Setup may choose, exactly as each provider names
+# itself, comma-separated. With SSO selected the issuer decides who signs in,
+# so no page can widen this. Empty by default: name your provider here before
+# selecting SSO on Setup.
+# SSO_ALLOWED_ISSUERS=https://id.example.org/oidc
+
+# How many proxies append to X-Forwarded-For in front of the application: the
+# load balancer and nginx, so 2. The client's address, which the per-address
+# limits count, is the entry this many from the end.
+# VERIFY_PROXY_HOPS=2
+
+# However busy it is, a sign-in ends this many seconds after it was made.
+# SESSION_ABSOLUTE_SECONDS=43200
+
+# Browsers that have been here once refuse plain http for this host for this
+# many seconds. Include subdomains only if you own every one of them.
+# VERIFY_HSTS_SECONDS=31536000
+# VERIFY_HSTS_INCLUDE_SUBDOMAINS=False
+
+# =============================================================================
+# Optional: offline credentials in the document QR
+# =============================================================================
+# Without an issuer key the document still prints, with a QR that holds only
+# the transaction id. The key and the epoch policy must match the
+# OfflineVerifier deployment whose phones will read the credentials:
+# `manage.py load_credential_keys` copies both from one and refuses on a
+# mismatch.
+#
+# ISSUER_KEY_FILE is the PEM on THIS machine. The deploy copies it to the
+# server's secrets directory and points CREDENTIAL_ISSUER_KEY_PATH at it.
+# ISSUER_KEY_FILE=secrets/verify-issuer.pem
+# CREDENTIAL_ISSUER_KEY_PATH=
+# CREDENTIAL_ISSUER_KEY_ID=1
+# Back on the key file after a credential signer: nothing is minted unless
+# this names CREDENTIAL_ISSUER_KEY_ID, the operator's word that the signer's
+# last deployment key was that same key (signer/deploy/README.md, "Leaving
+# signer mode").
+# CREDENTIAL_FILE_MODE_AFTER_SIGNER=
+# Wraps the epoch private keys at rest: 64 hex characters, or base64. Losing
+# it orphans every stored epoch key. Generate one with
+#   python -c "import secrets; print(secrets.token_hex(32))"
+# CREDENTIAL_EPOCH_WRAP_KEY=
+# CREDENTIAL_GENESIS=1750000000
+# CREDENTIAL_EPOCH_SECONDS=2592000
+# CREDENTIAL_OVERLAP_EPOCHS=3
+# CREDENTIAL_MAX_VALIDITY_DAYS=365
+# The most QR codes one document prints: credential, portrait and attachment
+# parts together; 0 is no cap, and 1 is refused (a photo needs two).
+# CREDENTIAL_MAX_QR_CODES=2
+# CREDENTIAL_REVOCATION_TTL_SECONDS=86400
+# CREDENTIAL_REVOCATION_REBUILD_SECONDS=300
+#
+# A credential signer (signer/deploy/README.md) holds the issuer keys
+# instead of the PEM file: its app socket, the issuing CAs' fingerprints the
+# phones pin, and the SHA-256 of the token its reconciler presents.
+# SIGNER_SOCKET=/run/cl03-signer/app.sock
+# CREDENTIAL_ISSUER_CA_FINGERPRINTS=
+# SIGNER_REPORT_TOKEN_SHA256=
+# Or a signer on a host of its own that dials out to this site and polls it
+# for jobs (signer/deploy/README.md, "Poll mode"): SIGNER_SOCKET empty, and
+# the key both ends sign with, 64 hex characters, the same as the signer's
+# credential poll-key. That key is on every app server, so anyone with a copy
+# can act as the signer from any address the proxy admits: the site's proxy
+# must admit /api/v1/signer/jobs/, answers/ and report/ only from the
+# signer's own egress addresses, and route them to a gunicorn pool of their
+# own. This kit's nginx answers 404 for /api/v1/signer/. A request waits at
+# most SIGNER_QUEUE_TIMEOUT_SECONDS for the signer's answer.
+# SIGNER_QUEUE_KEY=
+# SIGNER_QUEUE_TIMEOUT_SECONDS=10
+# How many of a worker's threads may wait for the signer at once, below
+# gunicorn's threads a worker: by default one fewer than GUNICORN_THREADS,
+# or 1. A backstop only: the signer's own requests need a pool of their own
+# (README). GUNICORN_THREADS also sets this kit's gunicorn threads (2 unset).
+# SIGNER_QUEUE_MAX_WAITING=
+# GUNICORN_THREADS=
+
+# =============================================================================
+# Optional: verifier phones and the holder's card
+# =============================================================================
+# Where the pairing QR sends a phone. Empty means the host that served the
+# page, which is right behind the load balancer.
+# DEVICE_PAIRING_BASE_URL=https://verify.example.org
+# DEVICE_PAIRING_TTL_SECONDS=900
+# DEVICE_LEASE_SECONDS=2592000
+# DEVICE_CHALLENGE_TTL_SECONDS=120
+# App Attest: every pairing and sync is checked and recorded; True refuses
+# anything that does not pass. The app id is "<TeamID>.<BundleID>"; the
+# environment is production for store builds, development for a developer's.
+# DEVICE_REQUIRE_APP_ATTEST=False
+# DEVICE_APP_ATTEST_APP_ID=ABCDE12345.org.example.verifier
+# DEVICE_APP_ATTEST_ENVIRONMENT=production
+# Refuse phones that sign /keys/ the old way, once none is left.
+# DEVICE_REQUIRE_KEYS_CONTEXT=False
+# Activity-log records one phone may store in any 24 hours.
+# DEVICE_LOG_DAILY_RECORDS=20000
+# Days the activity log is kept, from when a record arrived; a daily timer
+# deletes what is older.
+# DEVICE_LOG_RETENTION_DAYS=360
+# CARD_HANDOFF_TTL_SECONDS=300
+# The encoder for the face in the portrait symbol: webp, or avif once every
+# verifier app and idmanager reading your documents understands it.
+# PORTRAIT_FORMAT=webp
+
+# =============================================================================
+# Optional: holders registered from idmanager
+# =============================================================================
+# A person who verified themselves in idmanager registers their own phone and
+# is issued a credential. OFF unless both of the first two are set; the phone
+# is capped at the public tier and the person cannot sign in here. idmanager
+# prints both lines with `manage.py verify_holder_key`.
+# HOLDER_ASSERTION_ISSUER=https://idmanager.example.org
+# HOLDER_ASSERTION_KEYS=
+# HOLDER_ASSERTION_MAX_LIFETIME_SECONDS=600
+# HOLDER_VERIFICATION_MAX_AGE_SECONDS=900
+# HOLDER_CREDENTIAL_ISSUER_NAME=Self-verified with idmanager
+# Refuse holder phones that sign the old way, once none is left; with
+# DEVICE_REQUIRE_KEYS_CONTEXT.
+# HOLDER_REQUIRE_CONTEXT=False
+
+# =============================================================================
+# Optional: Apple Wallet passes
+# =============================================================================
+# All or none: without them the "Add to Apple Wallet" button is not drawn.
+# The three files are PEMs issued against your own Pass Type ID, on THIS
+# machine; the deploy copies them to the server and sets the matching
+# WALLET_*_PATH. An expired certificate still builds passes, and iOS refuses
+# them without a message, so note its expiry date.
+# WALLET_PASS_TYPE_ID=pass.org.example.verify
+# WALLET_TEAM_ID=
+# WALLET_CERT_FILE=secrets/wallet-cert.pem
+# WALLET_KEY_FILE=secrets/wallet-key.pem
+# WALLET_WWDR_FILE=secrets/wallet-wwdr.pem
+# WALLET_CERT_PATH=
+# WALLET_KEY_PATH=
+# WALLET_WWDR_PATH=
+
+# =============================================================================
+# Branding
+# =============================================================================
+# The site carries the name and logos you give it, and no one else's. With
+# none of these set, pages are titled "Verify" and have no footer.
+
+# The name before the colon in every page title.
+# SITE_TITLE=Verify
+
+# Logos in the footer of every page. Put the image files (PNG, JPEG, GIF or
+# WebP; not SVG) in a folder beside this file and list them, separated by
+# ";", each as file|link|alt text. The link and the text are optional. The
+# deploy copies the folder to the server and sets BRANDING_DIR to it.
+# BRANDING_FOLDER=branding
+# SITE_FOOTER_LOGOS=our-logo.png|https://www.example.org|Our organization;partner.png|https://partner.example.org|Our partner
+# A line above the logos, such as "Operated by".
+# SITE_FOOTER_LABEL=
+# BRANDING_DIR=
+
+# =============================================================================
+# Rarely needed
+# =============================================================================
+# Moves an existing pre-organization database's people and data into one
+# organization of this name, on that migrate. A new site ignores it.
+# VERIFY_DEFAULT_ORG_NAME=PSA
+
+# Development machines only, NEVER a server. With DJANGO_DEBUG=True the first
+# replaces eVerify with a mock that signs in whoever the browser names, and
+# the deploy refuses it; the second keeps whole eVerify responses (names, ID
+# numbers, faces) in the database, with DJANGO_DEBUG=True or with
+# VERIFY_WORKBENCH naming one of the site's own hosts -- a development
+# server that should not run with Django's debug pages.
+# EVERIFY_ALLOW_MOCK_LOGIN=False
+# EVERIFY_DEBUG_CAPTURE=False
+# VERIFY_WORKBENCH=
+
+# =============================================================================
+# A server built some other way (skips Terraform)
+# =============================================================================
+# By default the deploy finds the server and the bastion in the Terraform
+# state beside this file. Set these to deploy to a server you built yourself.
+# JUMP_HOST may stay empty for a server reachable directly.
+# SERVER_IP=
+# JUMP_HOST=
+# REMOTE_USER=ec2-user
+# APP_DIR=/home/ec2-user/app
+# REMOTE_SECRETS_DIR=/home/ec2-user/secrets

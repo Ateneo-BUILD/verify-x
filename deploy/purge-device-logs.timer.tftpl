@@ -1,0 +1,13 @@
+# Runs purge-device-logs.service once a day; installed beside it by
+# deploy/install-purge-timer.sh. At 18:00 UTC, 02:00 in Manila, when a long
+# delete is in nobody's way. A day the server was stopped is not caught up
+# at its start: the next day's run deletes both days' worth.
+[Unit]
+Description=Age out the phones' activity log daily
+
+[Timer]
+OnCalendar=*-*-* 18:00:00 UTC
+RandomizedDelaySec=30min
+
+[Install]
+WantedBy=timers.target

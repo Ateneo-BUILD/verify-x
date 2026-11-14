@@ -1,0 +1,2913 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verify Operator's Manual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap">
+<style>
+/* ---------------------------------------------------------------
+   Tokens. The accent is the application's own --primary-color
+   (#00529B) and its --secondary-color (#00386a); the neutrals are
+   pulled toward that blue rather than left at a flat grey.
+   Light is the bare :root; dark redefines only tokens, twice, so
+   both the un-stamped (system) and explicitly stamped states land
+   on a complete set.
+   --------------------------------------------------------------- */
+:root {
+  --ground:      #f4f6f9;
+  --surface:     #ffffff;
+  --surface-sub: #eef1f6;
+  --ink:         #14202c;
+  --ink-soft:    #45566a;
+  --ink-faint:   #6d7d8f;
+  --rule:        #d5dde7;
+  --rule-soft:   #e5eaf1;
+  --accent:      #00529B;
+  --accent-deep: #00386a;
+  --accent-wash: #e8f0f8;
+  --amber:       #8a5a06;
+  --amber-wash:  #fbf3e2;
+  --danger:      #a8332a;
+  --danger-wash: #fbeceb;
+  --good:        #1d7a4c;
+  --on-deep:     #ffffff;
+  --shadow:      0 1px 2px rgba(20,32,44,.06), 0 8px 24px -18px rgba(20,32,44,.35);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #0e151d;
+    --surface:     #151e28;
+    --surface-sub: #1b2733;
+    --ink:         #e4eaf1;
+    --ink-soft:    #a9b8c8;
+    --ink-faint:   #8494a6;
+    --rule:        #2b3a49;
+    --rule-soft:   #22303d;
+    --accent:      #6fb2ee;
+    --accent-deep: #a8cdf2;
+    --accent-wash: #16283a;
+    --amber:       #e0ab5c;
+    --amber-wash:  #2a2114;
+    --danger:      #f0928a;
+    --danger-wash: #2c1817;
+    --good:        #6cc79a;
+    --on-deep:     #0e151d;
+    --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 24px -18px rgba(0,0,0,.9);
+  }
+}
+:root[data-theme="dark"] {
+  --ground:      #0e151d;
+  --surface:     #151e28;
+  --surface-sub: #1b2733;
+  --ink:         #e4eaf1;
+  --ink-soft:    #a9b8c8;
+  --ink-faint:   #8494a6;
+  --rule:        #2b3a49;
+  --rule-soft:   #22303d;
+  --accent:      #6fb2ee;
+  --accent-deep: #a8cdf2;
+  --accent-wash: #16283a;
+  --amber:       #e0ab5c;
+  --amber-wash:  #2a2114;
+  --danger:      #f0928a;
+  --danger-wash: #2c1817;
+  --good:        #6cc79a;
+  --on-deep:     #0e151d;
+  --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 24px -18px rgba(0,0,0,.9);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation: none !important; transition: none !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- shell ---------------------------------------------------- */
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 1.5rem 6rem;
+}
+.masthead {
+  border-bottom: 1px solid var(--rule);
+  padding: 3rem 0 2rem;
+  margin-bottom: 2.5rem;
+}
+.eyebrow {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .74rem;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 .9rem;
+}
+h1 {
+  font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  font-size: clamp(2.3rem, 5.4vw, 3.5rem);
+  line-height: 1.06;
+  letter-spacing: -.015em;
+  margin: 0 0 .8rem;
+  text-wrap: balance;
+  color: var(--accent-deep);
+}
+.standfirst {
+  font-family: "Source Serif 4", Georgia, serif;
+  font-size: 1.2rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  max-width: 62ch;
+  margin: 0 0 1.6rem;
+}
+.stamp {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .78rem;
+  color: var(--ink-faint);
+  letter-spacing: .02em;
+}
+.stamp b { color: var(--ink-soft); font-weight: 500; }
+
+.cols {
+  display: grid;
+  grid-template-columns: 15.5rem minmax(0, 1fr);
+  gap: 3.5rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .cols { grid-template-columns: 1fr; gap: 2rem; }
+}
+
+/* ---- contents rail -------------------------------------------- */
+nav.toc {
+  position: sticky;
+  top: 1.5rem;
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
+  font-size: .84rem;
+  border-left: 2px solid var(--rule-soft);
+  padding-left: 1rem;
+}
+@media (max-width: 900px) {
+  nav.toc {
+    position: static; max-height: none; overflow: visible;
+    border-left: none; border-top: 1px solid var(--rule);
+    padding: 1.25rem 0 0;
+    columns: 2; column-gap: 2rem;
+  }
+}
+nav.toc .toc-head {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .7rem; letter-spacing: .13em; text-transform: uppercase;
+  color: var(--ink-faint); margin-bottom: .8rem;
+}
+nav.toc a {
+  display: block;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: .17rem 0;
+  break-inside: avoid;
+}
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--accent); }
+nav.toc a.part {
+  color: var(--accent-deep);
+  font-weight: 600;
+  margin-top: .9rem;
+  font-family: "Source Serif 4", Georgia, serif;
+  font-size: .95rem;
+}
+nav.toc a.part:first-of-type { margin-top: 0; }
+nav.toc a.sub { padding-left: .8rem; font-size: .8rem; }
+
+/* ---- reading column ------------------------------------------- */
+main { max-width: 72ch; }
+main > section { margin-bottom: 3.4rem; scroll-margin-top: 1.5rem; }
+
+.part-open {
+  border-top: 3px solid var(--accent-deep);
+  padding-top: 1.1rem;
+  margin: 4.5rem 0 2rem;
+}
+.part-open:first-child { margin-top: 0; }
+.part-num {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .74rem; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--accent);
+}
+h2 {
+  font-family: "Source Serif 4", Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(1.8rem, 3.4vw, 2.3rem);
+  line-height: 1.12;
+  letter-spacing: -.012em;
+  margin: .35rem 0 .5rem;
+  color: var(--accent-deep);
+  text-wrap: balance;
+}
+h3 {
+  font-family: "Source Serif 4", Georgia, serif;
+  font-weight: 600;
+  font-size: 1.42rem;
+  line-height: 1.22;
+  margin: 2.6rem 0 .55rem;
+  color: var(--ink);
+  text-wrap: balance;
+}
+h3 .n {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .82rem;
+  font-weight: 500;
+  color: var(--accent);
+  margin-right: .55rem;
+  font-variant-numeric: tabular-nums;
+}
+h4 {
+  font-size: .82rem;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 1.9rem 0 .5rem;
+}
+p { margin: 0 0 1rem; }
+main p, main li { max-width: 68ch; }
+strong { font-weight: 600; color: var(--ink); }
+em { font-style: italic; }
+a { color: var(--accent); }
+
+/* ---- utility type --------------------------------------------- */
+code, .mono, kbd {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .875em;
+}
+code {
+  background: var(--surface-sub);
+  border-radius: 3px;
+  padding: .1em .35em;
+  color: var(--accent-deep);
+}
+kbd {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: .08em .42em;
+  font-size: .8em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* ---- where-to-find-it line ------------------------------------ */
+.where {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .55rem;
+  font-size: .82rem;
+  color: var(--ink-faint);
+  border-bottom: 1px solid var(--rule-soft);
+  padding-bottom: .7rem;
+  margin: 0 0 1.2rem;
+}
+.where .k {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .68rem; letter-spacing: .12em; text-transform: uppercase;
+}
+.where .v { color: var(--ink-soft); }
+.where .v code { background: none; padding: 0; }
+
+/* ---- role chips ----------------------------------------------- */
+.chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+.chip {
+  display: inline-flex; align-items: center; gap: .35rem;
+  font-size: .72rem; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: .2rem .55rem;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.chip-site { background: var(--accent-deep); color: var(--on-deep); }
+.chip-org  { background: var(--accent-wash); color: var(--accent-deep); border-color: var(--accent); }
+.chip-op   { background: var(--surface-sub); color: var(--ink-soft); border-color: var(--rule); }
+
+/* ---- callouts. Border weight is spent by role, not stamped
+       on every block: a rule the software enforces gets the
+       accent rail; a cost gets amber; a refusal gets red. ------- */
+.note {
+  border-left: 3px solid var(--accent);
+  background: var(--accent-wash);
+  padding: .95rem 1.15rem;
+  margin: 1.4rem 0;
+  border-radius: 0 4px 4px 0;
+  font-size: .94rem;
+}
+.note.cost { border-left-color: var(--amber); background: var(--amber-wash); }
+.note.no   { border-left-color: var(--danger); background: var(--danger-wash); }
+.note p:last-child { margin-bottom: 0; }
+.note .lab {
+  display: block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .67rem; letter-spacing: .13em; text-transform: uppercase;
+  margin-bottom: .35rem;
+  color: var(--accent-deep);
+}
+.note.cost .lab { color: var(--amber); }
+.note.no .lab   { color: var(--danger); }
+
+/* ---- tables --------------------------------------------------- */
+.tw { overflow-x: auto; margin: 1.4rem 0; max-width: 72ch; }
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: .9rem;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  border-radius: 5px;
+  overflow: hidden;
+}
+th, td {
+  text-align: left;
+  padding: .6rem .8rem;
+  border-bottom: 1px solid var(--rule-soft);
+  vertical-align: top;
+}
+thead th {
+  background: var(--surface-sub);
+  font-size: .72rem;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 600;
+  white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: none; }
+td.num, th.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+td code { white-space: nowrap; }
+
+/* ---- procedures ----------------------------------------------- */
+ol.steps { counter-reset: s; list-style: none; margin: 1.2rem 0; padding: 0; }
+ol.steps > li {
+  counter-increment: s;
+  position: relative;
+  padding-left: 2.2rem;
+  margin-bottom: .8rem;
+}
+ol.steps > li::before {
+  content: counter(s);
+  position: absolute; left: 0; top: .1rem;
+  width: 1.5rem; height: 1.5rem;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--accent-wash);
+  color: var(--accent-deep);
+  border: 1px solid var(--accent);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .76rem;
+  font-variant-numeric: tabular-nums;
+}
+ul.plain { margin: 1rem 0; padding-left: 1.15rem; }
+ul.plain li { margin-bottom: .45rem; }
+
+/* ---- state pills, as the app draws them ------------------------ */
+.pill {
+  display: inline-block;
+  font-size: .7rem; font-weight: 600; letter-spacing: .03em;
+  padding: .12rem .45rem; border-radius: 10px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.pill.ok   { color: var(--good); }
+.pill.warn { color: var(--amber); }
+.pill.off  { color: var(--ink-faint); }
+
+/* ---- the scope ladder ------------------------------------------ */
+.ladder { display: grid; gap: .6rem; margin: 1.5rem 0 2rem; max-width: 72ch; }
+.rung {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--accent);
+  border-radius: 4px;
+  padding: .85rem 1rem;
+  box-shadow: var(--shadow);
+}
+.rung:nth-child(1) { border-left-color: var(--accent-deep); }
+.rung:nth-child(2) { border-left-color: var(--accent); }
+.rung:nth-child(3) { border-left-color: var(--ink-faint); }
+.rung .rt {
+  display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap;
+  margin-bottom: .2rem;
+}
+.rung .rn {
+  font-family: "Source Serif 4", Georgia, serif;
+  font-weight: 600; font-size: 1.06rem; color: var(--ink);
+}
+.rung .rs {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .7rem; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.rung p { margin: 0; font-size: .9rem; color: var(--ink-soft); max-width: none; }
+.rung .indent-1 { margin-left: 1.4rem; }
+
+/* ---- footer ---------------------------------------------------- */
+footer.doc {
+  border-top: 1px solid var(--rule);
+  margin-top: 4rem;
+  padding-top: 1.4rem;
+  font-size: .84rem;
+  color: var(--ink-faint);
+  max-width: 72ch;
+}
+
+/* ---- screen mockups --------------------------------------------
+   Drawings of the real interface, built from the application's own
+   tokens (#00529B, its card, tab, button and status styles) and its
+   own system font stack, so a mockup reads as the software rather
+   than as this document.
+
+   They stay LIGHT in both themes on purpose: the software is light,
+   and a screenshot does not invert. The frame around each one is
+   what says "this is a screen", so the fixed palette reads as the
+   subject rather than as a theming fault.
+   ---------------------------------------------------------------- */
+figure.screen {
+  margin: 1.7rem 0;
+  max-width: 72ch;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+/* The browser window itself, drawn as Chrome renders it on Windows: the tab
+   strip carries the page's real <title>, the omnibox its real address. */
+.screen .chrome {
+  background: #dee1e6;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  color: #3c4043;
+  -webkit-font-smoothing: antialiased;
+}
+.screen .tabs {
+  display: flex; align-items: flex-end; gap: .3rem;
+  padding: .3rem .3rem 0;
+}
+.screen .tab {
+  display: flex; align-items: center; gap: .35rem;
+  background: #fff; border-radius: 7px 7px 0 0;
+  padding: .3rem .5rem .32rem;
+  font-size: .68rem; color: #3c4043;
+  max-width: 60%; min-width: 0;
+}
+.screen .tab .tt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.screen .tab .fav {
+  width: 11px; height: 11px; border-radius: 2px; flex: 0 0 auto;
+  background: #00529B; color: #fff;
+  font-size: 7px; line-height: 11px; text-align: center; font-weight: 700;
+}
+.screen .tab .x { color: #80868b; font-size: .62rem; flex: 0 0 auto; }
+.screen .newtab { color: #5f6368; font-size: .8rem; line-height: 1; padding: 0 .2rem .35rem; }
+.screen .wc { margin-left: auto; display: flex; gap: .55rem; padding: 0 .15rem .4rem; }
+.screen .wc i { display: block; width: 8px; height: 8px; position: relative; }
+.screen .wc i::before, .screen .wc i::after {
+  content: ""; position: absolute; background: #5f6368;
+}
+.screen .wc .min::before { left: 0; right: 0; bottom: 3px; height: 1px; }
+.screen .wc .max::before { inset: 1px 0 1px 0; background: none; border: 1px solid #5f6368; }
+.screen .wc .cls::before, .screen .wc .cls::after {
+  left: 0; right: 0; top: 3.5px; height: 1px; transform-origin: center;
+}
+.screen .wc .cls::before { transform: rotate(45deg); }
+.screen .wc .cls::after  { transform: rotate(-45deg); }
+.screen .bar {
+  display: flex; align-items: center; gap: .35rem;
+  background: #fff; border-bottom: 1px solid #dadce0;
+  padding: .3rem .5rem;
+}
+.screen .bar .ic { color: #5f6368; flex: 0 0 auto; display: block; }
+.screen .bar .ic.dim { color: #bdc1c6; }
+.screen .omni {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: .35rem;
+  background: #f1f3f4; border-radius: 999px;
+  padding: .18rem .55rem;
+  font-size: .7rem; color: #202124;
+  margin: 0 .2rem;
+}
+.screen .omni .u {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.screen .omni .u b { font-weight: 400; color: #202124; }
+.screen .omni .u span { color: #5f6368; }
+.screen .pfp {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: #5f6368; flex: 0 0 auto;
+}
+.screen .kebab { display: flex; flex-direction: column; gap: 1.5px; padding: 0 .15rem; flex: 0 0 auto; }
+.screen .kebab i { width: 2px; height: 2px; border-radius: 50%; background: #5f6368; display: block; }
+
+/* the mobile variant, for the page the holder opens on their own phone */
+.screen .chrome.mobile .bar { border-bottom-color: #e0e0e0; }
+/* A phone-shaped window, because that is the only device this page is opened
+   on: the holder scans the counter's code with their own handset. */
+.screen.phone-fig { max-width: 304px; }
+.screen.phone-fig .ui { background: #fff; padding: .7rem .6rem; }
+.screen.phone-fig .ui .u-phone { border: none; border-radius: 0; width: auto; padding: .2rem 0 .5rem; }
+.screen figcaption {
+  font-size: .8rem; color: var(--ink-faint);
+  background: var(--surface); border-top: 1px solid var(--rule);
+  padding: .55rem .8rem;
+}
+.screen figcaption b { color: var(--ink-soft); font-weight: 600; }
+
+/* the application surface itself */
+.ui {
+  --p: #00529B; --s: #00386a; --bd: #e0e0e0;
+  --ok: #28a745; --err: #dc3545; --mut: #666;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 12.5px; line-height: 1.5;
+  background: #f4f7f9; color: #333;
+  /* The application centres itself in a fixed column and lets its background
+     show either side; a render that filled the window edge to edge would not
+     be what anybody sees. */
+  padding: .9rem 6%;
+  overflow-x: auto;
+}
+.ui-wide .ui { padding: .9rem 2.5%; }
+.ui * { box-sizing: border-box; }
+.ui .u-card {
+  background: #fff; border: 1px solid var(--bd); border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  padding: .75rem .9rem; margin-bottom: .6rem;
+}
+.ui .u-card:last-child { margin-bottom: 0; }
+.ui .u-h2 {
+  font-size: .95em; font-weight: 700; color: var(--s);
+  border-bottom: 1px solid var(--bd);
+  padding-bottom: .35rem; margin: 0 0 .6rem;
+  display: flex; align-items: center; gap: .4rem;
+}
+.ui .u-h1 { color: var(--p); font-size: 1.15em; font-weight: 700; text-align: center; margin: 0 0 .6rem; }
+.ui p { margin: 0 0 .5rem; max-width: none; }
+.ui p:last-child { margin-bottom: 0; }
+
+/* nav */
+.ui .u-nav {
+  display: flex; align-items: center; gap: .35rem; flex-wrap: wrap;
+  border-bottom: 1px solid var(--bd); padding-bottom: .5rem; margin-bottom: .6rem;
+}
+.ui .u-nav a {
+  color: #333; text-decoration: none; padding: .2rem .45rem; border-radius: 3px;
+  border-bottom: 2px solid transparent;
+}
+.ui .u-nav a.on { color: var(--p); font-weight: 700; border-bottom-color: var(--p); }
+.ui .u-nav .sp { margin-left: auto; }
+.ui .u-nav .who { color: #555; font-weight: 600; }
+
+/* controls */
+.ui .u-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--p); color: #fff; border: none; border-radius: 4px;
+  padding: .42rem .8rem; font-weight: 600; font-size: .95em;
+  font-family: inherit; white-space: nowrap;
+}
+.ui .u-btn.wide { width: 100%; }
+.ui .u-btn.sec { background: #6c757d; }
+.ui .u-btn.dis { background: #ccc; }
+.ui .u-btn.danger { background: var(--err); }
+.ui .u-btn.sm { padding: .25rem .55rem; font-size: .88em; }
+.ui .u-btns { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
+.ui .u-lab { display: block; font-weight: 600; font-size: .93em; margin-bottom: .2rem; }
+.ui .u-in {
+  border: 1.5px solid #999; border-radius: 4px; background: #fff;
+  padding: .35rem .5rem; margin-bottom: .5rem; color: #333;
+}
+.ui .u-in.ph { color: #999; }
+.ui .u-in.ro { background: #f1f3f5; color: #777; }
+.ui .u-fg { margin-bottom: .55rem; }
+.ui .u-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.ui .u-tabs { display: flex; border-bottom: 1px solid var(--bd); margin-bottom: .7rem; flex-wrap: wrap; }
+.ui .u-tabs span {
+  padding: .35rem .6rem; border-bottom: 3px solid transparent; margin-bottom: -1px; color: #333;
+}
+.ui .u-tabs span.on { color: var(--p); font-weight: 600; border-bottom-color: var(--p); }
+
+/* boxes */
+.ui .u-info { background: #eef; border-left: 4px solid var(--p); padding: .5rem .65rem; margin-bottom: .55rem; }
+.ui .u-status { border-radius: 4px; padding: .45rem .6rem; font-size: .95em; margin-bottom: .55rem; }
+.ui .u-status.ok  { background: #e9f7ec; color: var(--ok);  border: 1px solid var(--ok); }
+.ui .u-status.err { background: #fdecea; color: var(--err); border: 1px solid var(--err); }
+.ui .u-hint { color: var(--mut); font-size: .88em; }
+
+/* organization banner + context strip */
+.ui .u-banner {
+  display: flex; align-items: center; gap: .5rem; background: #fff;
+  border: 1px solid var(--bd); border-radius: 8px; padding: .45rem .6rem; margin-bottom: .5rem;
+}
+.ui .u-mark {
+  width: 30px; height: 30px; border-radius: 5px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  background: #00386a; color: #fff; font-weight: 700; font-size: .72em;
+}
+.ui .u-orgname { font-weight: 700; color: var(--s); }
+.ui .u-strip {
+  display: flex; align-items: center; gap: .35rem; background: #eef;
+  border-left: 4px solid var(--p); padding: .35rem .55rem; margin-bottom: .55rem; color: #555;
+}
+.ui .u-strip b { color: var(--s); }
+.ui .u-strip a { margin-left: auto; color: var(--p); font-weight: 600; text-decoration: none; }
+
+/* badges, pills, switches */
+.ui .u-badge { display: inline-block; padding: .06rem .35rem; border-radius: 3px; font-size: .82em; font-weight: 600; }
+.ui .u-badge.adm { background: #eef; color: var(--p); }
+.ui .u-badge.opr { background: #f0f0f0; color: #666; }
+.ui .u-badge.ok  { background: #e9f7ec; color: var(--ok); }
+.ui .u-badge.no  { background: #fdecea; color: var(--err); }
+.ui .u-badge.site{ background: var(--s); color: #fff; }
+.ui .u-sw {
+  display: inline-block; width: 30px; height: 17px; border-radius: 9px;
+  background: #ccc; position: relative; vertical-align: middle;
+}
+.ui .u-sw.on { background: var(--p); }
+.ui .u-sw::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 13px; height: 13px; border-radius: 50%; background: #fff;
+}
+.ui .u-sw.on::after { left: auto; right: 2px; }
+
+/* tables */
+/* The manual's own `table` rule paints a themed surface; inside a mockup the
+   table is part of the application, so it takes the application's white. */
+.ui table, .ui .u-tab {
+  width: 100%; border-collapse: collapse; font-size: .95em;
+  background: #fff; color: #333; box-shadow: none; border-radius: 0;
+}
+.ui .u-tab th, .ui .u-tab td {
+  border-bottom: 1px solid var(--bd); padding: .32rem .4rem; text-align: left; background: none;
+}
+.ui .u-tab th { font-size: .82em; text-transform: uppercase; letter-spacing: .04em; color: var(--mut); font-weight: 600; }
+.ui .u-tab td.r, .ui .u-tab th.r { text-align: right; }
+
+/* stat tiles */
+.ui .u-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; margin-bottom: .6rem; }
+.ui .u-tile { background: #fff; border: 1px solid var(--bd); border-radius: 8px; padding: .5rem; text-align: center; }
+.ui .u-tile b { display: block; font-size: 1.4em; color: var(--s); font-variant-numeric: tabular-nums; }
+.ui .u-tile span { font-size: .82em; color: var(--mut); }
+
+/* a stand-in QR, and a phone frame */
+.ui .u-qr { display: block; background: #fff; border: 1px solid var(--bd); }
+.ui .u-phone {
+  width: 168px; margin: 0 auto; border: 6px solid #2c3440; border-radius: 18px;
+  background: #fff; padding: .6rem .5rem; text-align: center;
+}
+.ui .u-face {
+  width: 46px; height: 46px; border-radius: 4px;
+  background: linear-gradient(145deg, #c9d2db 0%, #97a5b3 55%, #7d8b99 100%);
+  display: inline-block;
+}
+
+/* callout pins, keyed to the legend under each screen */
+.ui .pin, .legend .pin {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: #00529B; color: #fff;
+  font-family: "IBM Plex Mono", monospace; font-size: 9.5px; font-weight: 500;
+  vertical-align: middle; flex: 0 0 auto;
+}
+ol.legend { list-style: none; counter-reset: g; margin: .8rem 0 0; padding: 0; font-size: .9rem; }
+ol.legend > li { counter-increment: g; position: relative; padding-left: 1.6rem; margin-bottom: .35rem; }
+ol.legend > li::before {
+  content: counter(g);
+  position: absolute; left: 0; top: .25rem;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  display: grid; place-items: center;
+  font-family: "IBM Plex Mono", monospace; font-size: 9.5px;
+}
+
+/* the printed sheet, drawn to its own proportions */
+.sheet-fig {
+  display: grid; grid-template-columns: 190px 1fr; gap: 1.1rem;
+  align-items: start; margin: 1.6rem 0; max-width: 72ch;
+}
+@media (max-width: 620px) { .sheet-fig { grid-template-columns: 1fr; } }
+.a4 {
+  aspect-ratio: 210 / 297;
+  background: #fff; border: 1px solid var(--rule);
+  box-shadow: var(--shadow);
+  padding: 9px; display: flex; flex-direction: column; gap: 6px;
+  font-size: 8px; color: #55606d;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.a4 .band { background: #eaeef3; border-radius: 2px; }
+.a4 .hd { height: 22px; display: flex; align-items: center; justify-content: center; color: #00386a; font-weight: 700; font-size: 7.5px; }
+.a4 .rows { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.a4 .rows i { display: block; height: 5px; background: #eaeef3; border-radius: 1px; }
+.a4 .rows i:nth-child(odd) { background: #f1f4f7; }
+
+/* The identity band the sheet now opens with -- portrait, name, both ID
+   numbers -- drawn in the two forms the software actually produces. The
+   centred one is what an organization printing a normal field count gets;
+   .a4.tight is the fallback a very long list falls back to, where the
+   portrait moves BESIDE the name and the rows pair up. */
+.a4 .hero { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 2px 0 1px; }
+.a4 .hero .fc { width: 26px; height: 26px; border-radius: 2px; background: #dfe5ec; border: 1px solid #cfd7e0; flex: 0 0 auto; }
+.a4 .hero .nm { height: 7px; width: 74%; background: #2b3946; border-radius: 1px; }
+.a4 .hero .id { height: 3px; width: 86%; background: #c3ccd5; border-radius: 1px; }
+.a4 .rule { height: 2px; background: #00529B; border-radius: 1px; }
+.a4.tight .hero { flex-direction: row; align-items: center; gap: 5px; padding: 1px 0; }
+.a4.tight .hero .txt { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.a4.tight .hero .nm, .a4.tight .hero .id { width: 100%; }
+.a4.tight .rows { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 5px; align-content: start; }
+.a4.tight .rows i { height: 4px; }
+.a4.tight .rows i.wide { grid-column: 1 / -1; }
+.a4 .foot { display: flex; align-items: flex-end; gap: 6px; }
+.a4 .lines { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.a4 .lines i { display: block; height: 1px; background: #b9c3cd; }
+.a4 .seal {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1.5px solid #00529B; color: #00529B;
+  display: grid; place-items: center; font-size: 5px; font-weight: 700;
+}
+.a4 .cut { border-top: 1px dashed #9aa6b2; padding-top: 5px; }
+.a4 .card {
+  height: 58px; border: 1px solid #cfd7e0; border-radius: 2px;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.sheet-key { font-size: .88rem; }
+.sheet-key dt { font-weight: 600; color: var(--ink); margin-top: .7rem; }
+.sheet-key dt:first-child { margin-top: 0; }
+.sheet-key dd { margin: 0; color: var(--ink-soft); }
+
+
+
+/* ---- cover ------------------------------------------------------- */
+.masthead .product {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .82rem; color: var(--ink-soft);
+  border-top: 1px solid var(--rule);
+  padding-top: .9rem; margin: 1.6rem 0 .5rem;
+  max-width: 80ch;
+}
+
+/* ---- colophon ---------------------------------------------------- */
+.colophon {
+  border-top: 3px solid var(--accent-deep);
+  padding-top: 1.4rem;
+  margin-top: 4rem;
+  max-width: 72ch;
+}
+.colophon h2 { font-size: 1.5rem; margin: .3rem 0 1.4rem; }
+.colophon .cols2 {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 2.4rem;
+  align-items: start;
+}
+@media (max-width: 620px) { .colophon .cols2 { grid-template-columns: 1fr; } }
+.colophon h4 { margin-top: 0; }
+.colophon address {
+  font-style: normal;
+  font-size: .95rem;
+  line-height: 1.65;
+  color: var(--ink-soft);
+}
+.colophon address b { color: var(--ink); font-weight: 600; }
+.colophon address a { color: var(--accent); text-decoration: none; }
+.colophon .fine {
+  border-top: 1px solid var(--rule-soft);
+  margin-top: 2rem; padding-top: 1rem;
+  font-size: .84rem; color: var(--ink-faint);
+}
+.colophon .fine code { font-size: .82rem; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+/* ---- print ------------------------------------------------------
+   A4 with the page numbers supplied by the printer's own footer.
+   The whole palette is restated light, because the browser doing the
+   printing may be in dark mode and a manual is a paper object.
+   ------------------------------------------------------------------ */
+/* The page box, and the ONLY place the margins are set: a CSS `@page` margin
+   overrides whatever margins the print job asks for, so the two disagreeing
+   silently is how the printed column came out 15 mm wide when the build
+   script had asked for 24. The sides are wide enough to staple or punch
+   through, and they put the measure at about 82 characters. */
+@page { size: A4; margin: 16mm 24mm 18mm; }
+
+@media print {
+  :root, :root[data-theme="dark"], :root:not([data-theme="light"]) {
+    --ground:      #ffffff;
+    --surface:     #ffffff;
+    --surface-sub: #eef1f6;
+    --ink:         #14202c;
+    --ink-soft:    #3f4f61;
+    --ink-faint:   #5f6f80;
+    --rule:        #c8d2dd;
+    --rule-soft:   #dde4ec;
+    --accent:      #00529B;
+    --accent-deep: #00386a;
+    --accent-wash: #eef3f9;
+    --amber:       #7a5006;
+    --amber-wash:  #fcf5e7;
+    --danger:      #972c24;
+    --danger-wash: #fbeeed;
+    --good:        #16643e;
+    --on-deep:     #ffffff;
+    --shadow:      none;
+  }
+
+  html { font-size: 11pt; }
+  body { background: #fff; line-height: 1.5; }
+  .wrap { max-width: none; padding: 0; }
+
+  /* one column: the rail becomes a contents page of its own */
+  .cols { display: block; }
+  main { max-width: none; }
+  main p, main li, .tw, .ladder, .sheet-fig, figure.screen, ol.legend { max-width: none; }
+
+  nav.toc {
+    position: static; max-height: none; overflow: visible;
+    border: none; border-top: 1px solid var(--rule);
+    padding: .9rem 0 0; margin-bottom: 0;
+    columns: 2; column-gap: 14mm;
+    break-after: page;
+  }
+  nav.toc a { color: var(--ink-soft); }
+  nav.toc a.part { color: var(--accent-deep); }
+
+  .masthead { padding-top: 0; break-after: avoid; }
+
+  /* every part opens a page; the first is already at the top of one */
+  .part-open { break-before: page; margin-top: 0; }
+  #p1 { break-before: avoid; }
+
+  h2, h3, h4 { break-after: avoid; }
+  h3 { margin-top: 1.6rem; }
+  section { break-inside: auto; margin-bottom: 1.6rem; }
+
+  /* things that are unreadable when split down the middle */
+  figure.screen, .tw, .note, ol.legend, .ladder .rung, .sheet-fig, .where {
+    break-inside: avoid;
+  }
+  figure.screen { page-break-inside: avoid; }
+  ol.steps > li, ul.plain li { break-inside: avoid; }
+
+  /* A screen and the legend explaining its pins belong together -- but only
+     when there IS a legend. Binding every figure to whatever follows it just
+     drags paragraphs onto the next page and leaves half-empty ones behind. */
+  figure.screen:has(+ ol.legend) { break-after: avoid; }
+  p, li { orphans: 2; widows: 2; }
+
+  a { color: var(--accent); text-decoration: none; }
+  .screen .chrome { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* The printed column is about 612 px wide, which trips this page's own
+     620 px narrow-screen rule and stacks the sheet diagram into one column
+     -- where the A4 aspect ratio then made it 229 mm tall and it took a
+     whole page to itself. Restate the two-column form in millimetres. */
+  .sheet-fig { grid-template-columns: 62mm 1fr; gap: 8mm; }
+  .a4 { max-width: 62mm; }
+
+
+  /* The cover fills page one; the colophon takes the last page. */
+  .masthead {
+    display: flex; flex-direction: column;
+    min-height: 245mm;
+    padding-top: 24mm;
+    border-bottom: none;
+    break-after: page;
+  }
+  .masthead h1 { font-size: 34pt; }
+  .masthead .standfirst { font-size: 13pt; }
+
+  .colophon {
+    break-before: page;
+    margin-top: 0;
+    min-height: 200mm;
+    display: flex; flex-direction: column;
+  }
+
+  footer.doc { break-inside: avoid; max-width: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">User manual</p>
+  <h1>Verify Operator's Manual</h1>
+  <p class="standfirst">Checking a person against the National ID, printing what was checked,
+    and running the site that does it &mdash; written for the three people who use this
+    software: the operator at the counter, the administrator of an organization, and the
+    administrator of the site.</p>
+  <p class="product">Verify &mdash; National ID verification for many organizations</p>
+  <p class="stamp"><b>Version 1.5 &middot; build 00052</b> &middot; 11 September 2026</p>
+</header>
+
+<!-- One QR pattern, referenced by every stand-in symbol drawn below. Kept in a
+     zero-sized SVG rather than display:none so the paint server always resolves. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <pattern id="qp" width="5" height="5" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="1" height="1" fill="#111"></rect>
+      <rect x="2" y="0" width="2" height="1" fill="#111"></rect>
+      <rect x="1" y="1" width="1" height="1" fill="#111"></rect>
+      <rect x="4" y="1" width="1" height="1" fill="#111"></rect>
+      <rect x="0" y="2" width="1" height="2" fill="#111"></rect>
+      <rect x="3" y="2" width="1" height="1" fill="#111"></rect>
+      <rect x="2" y="3" width="1" height="1" fill="#111"></rect>
+      <rect x="4" y="3" width="1" height="2" fill="#111"></rect>
+      <rect x="1" y="4" width="2" height="1" fill="#111"></rect>
+    </pattern>
+  </defs>
+</svg>
+
+<div class="cols">
+
+<nav class="toc" aria-label="Contents">
+  <div class="toc-head">Contents</div>
+  <a class="part" href="#p1">1 &nbsp;Orientation</a>
+  <a class="sub" href="#s11">1.1 The three roles</a>
+  <a class="sub" href="#s12">1.2 Signing in</a>
+  <a class="sub" href="#s13">1.3 Organization and location</a>
+  <a class="sub" href="#s14">1.4 The navigation bar</a>
+  <a class="sub" href="#s15">1.5 Demo Mode</a>
+
+  <a class="part" href="#p2">2 &nbsp;The operator</a>
+  <a class="sub" href="#s21">2.1 Verify a person</a>
+  <a class="sub" href="#s22">2.2 When it does not succeed</a>
+  <a class="sub" href="#s23">2.3 The verification document</a>
+  <a class="sub" href="#s24">2.4 Send the card to the phone</a>
+  <a class="sub" href="#s25">2.5 Validate a document</a>
+  <a class="sub" href="#s26">2.6 Your paired phones</a>
+  <a class="sub" href="#s27">2.7 Your own settings</a>
+
+  <a class="part" href="#p3">3 &nbsp;Organization admin</a>
+  <a class="sub" href="#s31">3.1 What you administer</a>
+  <a class="sub" href="#s32">3.2 Statistics</a>
+  <a class="sub" href="#s33">3.3 Export the log</a>
+  <a class="sub" href="#s34">3.4 Profile and mark</a>
+  <a class="sub" href="#s35">3.5 eVerify credentials</a>
+  <a class="sub" href="#s36">3.6 People</a>
+  <a class="sub" href="#s37">3.7 Locations and types</a>
+
+  <a class="part" href="#p4">4 &nbsp;Site administrator</a>
+  <a class="sub" href="#s41">4.1 The Site page</a>
+  <a class="sub" href="#s42">4.2 Create an organization</a>
+  <a class="sub" href="#s43">4.3 Manage an organization</a>
+  <a class="sub" href="#s44">4.4 Which fields are kept</a>
+  <a class="sub" href="#s45">4.5 Disable, or delete</a>
+  <a class="sub" href="#s46">4.6 How the site signs in</a>
+  <a class="sub" href="#s47">4.7 Who may read holder details</a>
+  <a class="sub" href="#s48">4.8 Credentials and revocation</a>
+  <a class="sub" href="#s49">4.9 Refused sign-in attempts</a>
+
+  <a class="part" href="#p5">5 &nbsp;Reference</a>
+  <a class="sub" href="#s51">5.1 What Demo Mode hides</a>
+  <a class="sub" href="#s52">5.2 The printed sheet</a>
+  <a class="sub" href="#s53">5.3 Messages and what to do</a>
+  <a class="sub" href="#s54">5.4 Glossary</a>
+</nav>
+
+<main>
+
+<!-- ============================================================ 1 -->
+<div class="part-open" id="p1">
+  <div class="part-num">Part one</div>
+  <h2>Orientation</h2>
+</div>
+
+<section>
+  <p>Verify checks a person standing in front of you against the Philippine National ID,
+    using the PSA's eVerify service and a live face check. When the service names them, the
+    system prints an authentication document and can issue a card the person carries on
+    their own phone &mdash; a card a checkpoint can read later with no network at all.</p>
+  <p>One installation serves many organizations. Everything an organization owns &mdash; its
+    counters, its transaction types, its people, its own eVerify account &mdash; belongs to
+    that organization and to nobody else.</p>
+
+  <div class="note">
+    <span class="lab">About the screens in this manual</span>
+    <p>Each screen is drawn from the software's own styles, at the size and in the order you
+      will meet it. Where a number or a name appears it is the site's own <strong>sample
+      record</strong> &mdash; <em>Lisa Rose Reyes Cruz, 0000-1111-2222-3333</em> &mdash; a
+      person who does not exist, kept precisely so a document can be looked at without a real
+      one. No screen here shows anybody's data.</p>
+    <p>Numbered pins <span class="pin">1</span> on a screen are explained in the list
+      directly under it.</p>
+  </div>
+</section>
+
+<section id="s11">
+  <h3><span class="n">1.1</span>The three roles</h3>
+  <p>The roles nest. Each one is a scope, and the pages you see are the scopes you hold.</p>
+
+  <div class="ladder">
+    <div class="rung">
+      <div class="rt"><span class="rn">Site administrator</span><span class="rs">the whole installation</span></div>
+      <p>Creates organizations, decides how everyone signs in, and decides which eVerify
+        fields an organization prints and keeps. Held site-wide, whether or not the person
+        belongs to any organization &mdash; otherwise nobody could create the first one.</p>
+    </div>
+    <div class="rung">
+      <div class="rt"><span class="rn">Organization administrator</span><span class="rs">one organization</span></div>
+      <p>Runs one organization's daily business: its people, its counters, its transaction
+        types, its eVerify account, its statistics and its export. Being an admin at one
+        organization gives you nothing at another.</p>
+    </div>
+    <div class="rung">
+      <div class="rt"><span class="rn">Operator</span><span class="rs">one counter</span></div>
+      <p>Verifies people, prints documents, hands over cards, validates documents somebody
+        else printed, and pairs their own phones.</p>
+    </div>
+  </div>
+
+  <p>The same person is routinely an operator at one organization and an administrator at
+    another, so the role is a property of the pairing, not of the person. Site
+    administration is separate again, and independent of both.</p>
+
+  <div class="note">
+    <span class="lab">The rule behind every screen</span>
+    <p>Which organization you are working in comes from your session, never from the
+      address bar. An organization you do not belong to does not appear to you as
+      <em>forbidden</em>; it simply does not exist on your screen. This is re-checked on
+      every request, so removing somebody's membership ends their access immediately
+      rather than at their next sign-in.</p>
+  </div>
+
+  <h4>Who can do what</h4>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Task</th><th>Operator</th><th>Org admin</th><th>Site admin</th></tr></thead>
+      <tbody>
+        <tr><td>Verify a person, print, hand over a card</td><td>Yes</td><td>Yes</td><td>Yes, in any enabled organization</td></tr>
+        <tr><td>Validate a printed document</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Pair and revoke their own phones</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Demo Mode, fingerprint reader</td><td>Own only</td><td>Own only</td><td>Own only</td></tr>
+        <tr><td>Add and remove members, set roles</td><td>&mdash;</td><td>This organization</td><td>Any organization</td></tr>
+        <tr><td>Locations and transaction types</td><td>&mdash;</td><td>This organization</td><td>&mdash;</td></tr>
+        <tr><td>Statistics and CSV export</td><td>&mdash;</td><td>This organization</td><td>&mdash;</td></tr>
+        <tr><td>eVerify account used for verifying</td><td>&mdash;</td><td>This organization</td><td>Any organization</td></tr>
+        <tr><td>Which fields print and are logged</td><td>&mdash;</td><td>&mdash;</td><td>Yes</td></tr>
+        <tr><td>Create, enable, disable, delete an organization</td><td>&mdash;</td><td>&mdash;</td><td>Yes</td></tr>
+        <tr><td>Login method and sign-in credentials</td><td>&mdash;</td><td>&mdash;</td><td>Yes</td></tr>
+        <tr><td>How long new credentials stay valid</td><td>&mdash;</td><td>&mdash;</td><td>Yes</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>A site administrator may enter any enabled organization and work in it. Anything they
+    do there without a membership is stamped as such in that organization's log, so an
+    organization's records never appear to show an operator it never assigned.</p>
+</section>
+
+<section id="s12">
+  <h3><span class="n">1.2</span>Signing in</h3>
+  <div class="where"><span class="k">Where</span><span class="v">your site's address, such as <code>https://verify.example.org/</code></span></div>
+
+  <p>There are two sign-in methods and the site uses exactly one of them, chosen by a site
+    administrator. Whichever is in use, the same rule holds: <strong>your identity comes
+    only from what the National ID service returned, and only somebody already registered
+    here is given a session.</strong> Nothing you type decides who you are.</p>
+
+  <h4>By National ID and face check</h4>
+  <ol class="steps">
+    <li>Read the consent notice and press <kbd>Give Consent</kbd>.</li>
+    <li>Enter your <strong>National ID card number</strong> or your <strong>Digital
+      National ID</strong>. You can also press <kbd>Scan with Camera</kbd> or
+      <kbd>Upload QR Image</kbd> to read them off the card's QR.</li>
+    <li>Press <kbd>Start Liveness Check &amp; Login</kbd>. The National ID service opens its
+      own camera window; follow it.</li>
+    <li>The answer takes a few seconds. On success you land on the Verify page.</li>
+  </ol>
+
+  <figure class="screen">
+    <div class="chrome">
+      <div class="tabs">
+        <span class="tab"><span class="fav">V</span><span class="tt">Verify: Login</span><span class="x">&#10005;</span></span>
+        <span class="newtab">+</span>
+        <span class="wc"><i class="min"></i><i class="max"></i><i class="cls"></i></span>
+      </div>
+      <div class="bar">
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg><svg class="ic dim" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg><svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13.2 2.2v3h-3"/></svg>
+        <span class="omni"><svg class="ic" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.6" y="7" width="8.8" height="6.4" rx="1.3"/><path d="M5.6 7V5.4a2.4 2.4 0 0 1 4.8 0V7"/></svg><span class="u"><b>verify.example.org</b><span>/</span></span></span>
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.6l1.65 3.35 3.7.55-2.67 2.6.63 3.68L8 11.05 4.69 12.78l.63-3.68-2.67-2.6 3.7-.55z"/></svg><span class="pfp"></span><span class="kebab"><i></i><i></i><i></i></span>
+      </div>
+    </div>
+    <div class="ui">
+      <div class="u-h1">Login with National ID</div>
+      <div class="u-card">
+        <div class="u-fg">
+          <span class="u-lab"><span class="pin">1</span> National ID Card Number or Digital National ID Number</span>
+          <div class="u-in">0000-1111-2222-3333</div>
+        </div>
+        <div class="u-btns" style="margin-bottom:.55rem;">
+          <span class="u-btn sm" style="flex:1;"><span class="pin" style="margin-right:.3rem;">2</span> Scan with Camera</span>
+          <span class="u-btn sm" style="flex:1;">Upload QR Image</span>
+        </div>
+        <div class="u-btn wide"><span class="pin" style="margin-right:.35rem;">3</span> Start Liveness Check &amp; Login</div>
+        <div class="u-fg" style="margin-top:.7rem;">
+          <span class="u-lab">Public API Key (for Liveness SDK)</span>
+          <div class="u-in ro">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</div>
+          <div class="u-hint">Filled in by the site. You never type here.</div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>The sign-in page.</b> A consent notice covers it until you press
+      <em>Give Consent</em>.</figcaption>
+  </figure>
+  <ol class="legend">
+    <li>Type either number. Both are printed on the card.</li>
+    <li>Or read them off the card's QR instead of typing.</li>
+    <li>Opens the National ID service's own camera window. The answer takes a few seconds.</li>
+  </ol>
+
+  <p>If the site is set to <strong>National ID sign-in service</strong> instead, the page
+    shows a single <kbd>Sign in with National ID</kbd> button. You are taken to the
+    provider, checked there, and returned. Only registered operators get a session on that
+    path too.</p>
+
+  <div class="note cost">
+    <span class="lab">If sign-in fails</span>
+    <p><em>"An ID for the provided details could not be found."</em> means this site has no
+      operator registered under the number you typed. The face check still ran, and it took
+      the same few seconds it always does &mdash; a faster refusal would tell anybody who
+      asked whose numbers are registered here.</p>
+    <p>One real case looks like this and is fixable in a minute: a member added by
+      <strong>card number only</strong>, who has never signed in, typing the
+      <strong>Digital National ID printed on the same card</strong>. An administrator adds
+      the digital ID on the People list &mdash; it is flagged there as
+      <em>Card number only</em> &mdash; and it works. See <a href="#s36">3.6</a>.</p>
+  </div>
+
+  <p>The login page asks for no location. Signed out, the site does not yet know which
+    organization you belong to, so it cannot know which counters to offer you. That comes
+    next.</p>
+</section>
+
+<section id="s13">
+  <h3><span class="n">1.3</span>Which organization, and which counter</h3>
+  <div class="where"><span class="k">Where</span><span class="v"><code>/choose/</code>, and the strip at the top of the Verify page</span></div>
+
+  <p>After signing in you pick the organization you are working for and the location you are
+    sitting at. Transactions are logged against both.</p>
+  <p><strong>If there is only one possible answer you never see this page.</strong> One
+    organization and at most one location means there is nothing to ask, and the common case
+    must not get slower. Otherwise: choose an organization, choose a location, press
+    <kbd>Continue</kbd>.</p>
+  <figure class="screen">
+    <div class="chrome">
+      <div class="tabs">
+        <span class="tab"><span class="fav">V</span><span class="tt">Verify: Select Organization</span><span class="x">&#10005;</span></span>
+        <span class="newtab">+</span>
+        <span class="wc"><i class="min"></i><i class="max"></i><i class="cls"></i></span>
+      </div>
+      <div class="bar">
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg><svg class="ic dim" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg><svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13.2 2.2v3h-3"/></svg>
+        <span class="omni"><svg class="ic" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.6" y="7" width="8.8" height="6.4" rx="1.3"/><path d="M5.6 7V5.4a2.4 2.4 0 0 1 4.8 0V7"/></svg><span class="u"><b>verify.example.org</b><span>/choose/</span></span></span>
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.6l1.65 3.35 3.7.55-2.67 2.6.63 3.68L8 11.05 4.69 12.78l.63-3.68-2.67-2.6 3.7-.55z"/></svg><span class="pfp"></span><span class="kebab"><i></i><i></i><i></i></span>
+      </div>
+    </div>
+    <div class="ui">
+      <div class="u-h1">Select your organization</div>
+      <div class="u-card">
+        <div class="u-h2">Organization</div>
+        <div style="display:grid; gap:.35rem; margin-bottom:.8rem;">
+          <div style="display:flex; align-items:center; gap:.5rem; border:1.5px solid #00529B; background:#eef; border-radius:5px; padding:.4rem .5rem;">
+            <span class="u-mark">PSA</span>
+            <span><b style="color:#00386a;">Philippine Statistics Authority</b><br>
+              <span class="u-hint">Operator</span></span>
+          </div>
+          <div style="display:flex; align-items:center; gap:.5rem; border:1px solid #e0e0e0; border-radius:5px; padding:.4rem .5rem;">
+            <span class="u-mark" style="background:#7a5d3a;">CB</span>
+            <span><b>City of Bacoor</b><br><span class="u-hint">Admin</span></span>
+          </div>
+        </div>
+        <div class="u-h2">Location</div>
+        <div style="display:flex; gap:.35rem; flex-wrap:wrap; margin-bottom:.7rem;">
+          <span style="border:1.5px solid #00529B; background:#eef; border-radius:5px; padding:.25rem .55rem; color:#00386a; font-weight:600;">Window 3</span>
+          <span style="border:1px solid #e0e0e0; border-radius:5px; padding:.25rem .55rem;">Window 4</span>
+          <span style="border:1px solid #e0e0e0; border-radius:5px; padding:.25rem .55rem;">Satellite &mdash; Mall</span>
+        </div>
+        <div class="u-btn wide">Continue</div>
+      </div>
+    </div>
+    <figcaption><b>Choosing a context.</b> You only ever see this when there is more than one
+      answer. One organization with at most one location goes straight through.</figcaption>
+  </figure>
+
+  <p>When you can work in more than one place, a thin strip sits above the Verify page
+    &mdash; <em>Verifying at <b>Window 3</b></em> &mdash; with a <kbd>Change</kbd> link back
+    to the chooser. Your last choice is remembered on that computer as a convenience; it
+    grants nothing, and your memberships are what decide what you may pick.</p>
+</section>
+
+<section id="s14">
+  <h3><span class="n">1.4</span>The navigation bar</h3>
+  <p>Every signed-in page carries the same bar. What is on it is what you hold &mdash; the
+    last two tabs simply are not drawn for somebody who does not administer anything.</p>
+
+  <figure class="screen">
+    <div class="chrome">
+      <div class="tabs">
+        <span class="tab"><span class="fav">V</span><span class="tt">Verify: National ID</span><span class="x">&#10005;</span></span>
+        <span class="newtab">+</span>
+        <span class="wc"><i class="min"></i><i class="max"></i><i class="cls"></i></span>
+      </div>
+      <div class="bar">
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg><svg class="ic dim" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg><svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13.2 2.2v3h-3"/></svg>
+        <span class="omni"><svg class="ic" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.6" y="7" width="8.8" height="6.4" rx="1.3"/><path d="M5.6 7V5.4a2.4 2.4 0 0 1 4.8 0V7"/></svg><span class="u"><b>verify.example.org</b><span>/app/</span></span></span>
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.6l1.65 3.35 3.7.55-2.67 2.6.63 3.68L8 11.05 4.69 12.78l.63-3.68-2.67-2.6 3.7-.55z"/></svg><span class="pfp"></span><span class="kebab"><i></i><i></i><i></i></span>
+      </div>
+    </div>
+    <div class="ui">
+      <div class="u-nav">
+        <a href="#s21" class="on">Verify</a>
+        <a href="#s25">Validate</a>
+        <a href="#s26">Devices</a>
+        <a href="#s27">Setup</a>
+        <a href="#p3" style="color:#00529B;">Organization <span class="pin">1</span></a>
+        <a href="#p4" style="color:#00529B;">Site <span class="pin">2</span></a>
+        <span class="sp"></span>
+        <span class="who">LISA CRUZ <span class="pin">3</span></span>
+        <span class="u-btn sm sec">Logout</span>
+      </div>
+      <div class="u-banner">
+        <span class="u-mark">PSA</span>
+        <span class="u-orgid">
+          <span class="u-orgname">Philippine Statistics Authority</span><br>
+          <span class="u-hint">Civil Registry Services</span>
+        </span>
+      </div>
+      <div class="u-strip">Verifying at <b>Window 3</b><a href="#s13">Change</a> <span class="pin">4</span></div>
+    </div>
+    <figcaption><b>The bar, the banner and the context strip</b>, as they sit above every
+      signed-in page.</figcaption>
+  </figure>
+  <ol class="legend">
+    <li>Shown only to an administrator of the organization you are currently in.</li>
+    <li>Shown only to a site administrator, whatever organization you are in.</li>
+    <li>Your own name, shortened to one given name and your whole surname &mdash; redacted
+      like anything else while Demo Mode is on.</li>
+    <li>The counter this session logs against. Absent when you have only one possible
+      answer, because there would be nothing to change.</li>
+  </ol>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Tab</th><th>Shown to</th><th>What it is</th></tr></thead>
+      <tbody>
+        <tr><td><b>Verify</b></td><td>Everyone</td><td>Check a person, and print the result.</td></tr>
+        <tr><td><b>Validate</b></td><td>Everyone</td><td>Scan a document somebody else printed and pull up its record.</td></tr>
+        <tr><td><b>Devices</b></td><td>Everyone</td><td>The phones you have paired for offline checking.</td></tr>
+        <tr><td><b>Setup</b></td><td>Everyone</td><td>Your own Demo Mode and fingerprint reader. Site settings appear here too, for site administrators only.</td></tr>
+        <tr><td><b>Organization</b></td><td>Org admins</td><td>The organization you are currently working in.</td></tr>
+        <tr><td><b>Site</b></td><td>Site admins</td><td>Every organization on the installation.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Your own name sits at the far right, beside <kbd>Logout</kbd>. It is shortened to one
+    given name and your whole surname &mdash; the surname is never cut, because
+    <em>Dela Cruz</em>, <em>De los Santos</em> and <em>Santos-Lopez</em> are one surname
+    each and trimming them puts somebody else's name in the corner.</p>
+</section>
+
+<section id="s15">
+  <h3><span class="n">1.5</span>Demo Mode</h3>
+  <div class="where"><span class="k">Where</span><span class="v">Setup &rarr; User Settings</span><span class="k">Scope</span><span class="v">You, everywhere you go</span></div>
+
+  <p>Demo Mode redacts what is on the screen so a real ID can be shown to an audience. It is
+    a property of the person presenting, not of the desk, so it follows you across every
+    organization and every page &mdash; including the pages where staff are listed by name
+    and by both ID numbers.</p>
+  <p>What it covers: the verification result and the printed document, the card handed to a
+    phone, the offline credential inside it, the people lists, the eVerify addresses and
+    client IDs on the settings pages, and your own name in the corner. What it does
+    <em>not</em> cover: <strong>the transaction log and the CSV export.</strong> A
+    demonstration verification really happened and is recorded truthfully; an export is a
+    data operation, not something on a projector.</p>
+
+  <div class="note cost">
+    <span class="lab">While presenting</span>
+    <p>Masked fields on settings pages are read-only, and the server refuses to save a value
+      that still contains the redaction bullets &mdash; otherwise pressing <kbd>Save</kbd>
+      during a demonstration would write bullets over the client ID the whole site signs in
+      against. If you genuinely need to change one of those values, retype it in full and it
+      will be accepted.</p>
+  </div>
+  <p>The exact conventions are in <a href="#s51">5.1</a>.</p>
+</section>
+
+<!-- ============================================================ 2 -->
+<div class="part-open" id="p2">
+  <div class="part-num">Part two &middot; <span class="chips" style="display:inline-flex"><span class="chip chip-op">Operator</span></span></div>
+  <h2>At the counter</h2>
+</div>
+
+<section id="s21">
+  <h3><span class="n">2.1</span>Verify a person</h3>
+  <div class="where"><span class="k">Where</span><span class="v">Verify</span></div>
+
+  <p>Every verification starts with consent. The notice names what is collected &mdash; name,
+    date of birth, and a biometric photo &mdash; and why. Read it to the person and press
+    <kbd>Give Consent</kbd>, or <kbd>Withhold Consent</kbd> to stop.</p>
+
+  <h4>Step 1 &mdash; provide the data</h4>
+  <p>Three tabs, and you only need one of them.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Tab</th><th>Use it when</th><th>What you do</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Scan QR Code</b></td>
+          <td>The person has their physical or digital card.</td>
+          <td><kbd>Start Camera Scan</kbd>, hold the card up, <kbd>Capture QR</kbd>. Or
+            <kbd>Upload QR Image</kbd> for a photo of the card.</td>
+        </tr>
+        <tr>
+          <td><b>Manual Entry</b></td>
+          <td>You can read a number off the card but the QR will not scan.</td>
+          <td>Type the National ID card number (<code>1234-5678-9012-3456</code>) or the
+            Digital National ID.</td>
+        </tr>
+        <tr>
+          <td><b>Demographic Form</b></td>
+          <td>There is no card at all.</td>
+          <td>First name, middle name, last name, suffix if any, and birth date as
+            <code>mm/dd/yyyy</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure class="screen">
+    <div class="chrome">
+      <div class="tabs">
+        <span class="tab"><span class="fav">V</span><span class="tt">Verify: National ID</span><span class="x">&#10005;</span></span>
+        <span class="newtab">+</span>
+        <span class="wc"><i class="min"></i><i class="max"></i><i class="cls"></i></span>
+      </div>
+      <div class="bar">
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg><svg class="ic dim" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg><svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13.2 2.2v3h-3"/></svg>
+        <span class="omni"><svg class="ic" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.6" y="7" width="8.8" height="6.4" rx="1.3"/><path d="M5.6 7V5.4a2.4 2.4 0 0 1 4.8 0V7"/></svg><span class="u"><b>verify.example.org</b><span>/app/</span></span></span>
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.6l1.65 3.35 3.7.55-2.67 2.6.63 3.68L8 11.05 4.69 12.78l.63-3.68-2.67-2.6 3.7-.55z"/></svg><span class="pfp"></span><span class="kebab"><i></i><i></i><i></i></span>
+      </div>
+    </div>
+    <div class="ui">
+      <div class="u-card">
+        <div class="u-h2">Step 1: Provide Your Data</div>
+        <div class="u-tabs">
+          <span>Scan QR Code</span><span>Manual Entry</span><span class="on">Demographic Form</span>
+        </div>
+        <div class="u-grid2">
+          <div><span class="u-lab">First Name</span><div class="u-in">LISA ROSE</div></div>
+          <div><span class="u-lab">Middle Name</span><div class="u-in">REYES</div></div>
+          <div><span class="u-lab">Last Name</span><div class="u-in">CRUZ</div></div>
+          <div><span class="u-lab">Suffix (Optional)</span><div class="u-in ph">JR</div></div>
+        </div>
+        <div class="u-fg" style="max-width:50%;">
+          <span class="u-lab">Birth Date</span><div class="u-in">03/14/1988</div>
+        </div>
+      </div>
+      <div class="u-card">
+        <div class="u-h2">Step 2: Verify Your Identity</div>
+        <div class="u-btns">
+          <span class="u-btn" style="flex:1;"><span class="pin" style="margin-right:.35rem;">1</span> Start Face Camera &amp; Verify</span>
+          <span class="u-btn" style="flex:1;"><span class="pin" style="margin-right:.35rem;">2</span> Scan Fingerprint &amp; Verify</span>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>The Verify page.</b> One tab of Step 1, then one button of Step 2. The
+      example person is the site's own sample record, not a real one.</figcaption>
+  </figure>
+  <ol class="legend">
+    <li>Always present. Opens the National ID service's own camera window.</li>
+    <li>Present only when a reader serial number is set for you at this organization
+      (<a href="#s27">2.7</a>). Otherwise this button is not drawn at all.</li>
+  </ol>
+
+  <h4>Step 2 &mdash; verify the person</h4>
+  <p>Press <kbd>Start Face Camera &amp; Verify</kbd>. The National ID service opens its own
+    camera window and runs the live face check; when it finishes, the lookup goes out with
+    the face check attached.</p>
+  <p>If a fingerprint reader is configured for you at this organization, a second button,
+    <kbd>Scan Fingerprint &amp; Verify</kbd>, appears beside it. It is offered only once a
+    serial number is set on your Setup page &mdash; see <a href="#s27">2.7</a>.</p>
+
+  <div class="note no">
+    <span class="lab">If the page says verification cannot run</span>
+    <p><em>"&hellip; has no eVerify credentials yet"</em> means this organization's own
+      eVerify account has not been filled in. Nothing you can do at the counter fixes it;
+      an organization administrator adds them on the Organization page
+      (<a href="#s35">3.5</a>). The account is deliberately per organization, because usage
+      bills to it.</p>
+  </div>
+
+  <p>A success takes you straight to the document page. Anything else lands on the outcome
+    screen below.</p>
+</section>
+
+<section id="s22">
+  <h3><span class="n">2.2</span>When it does not succeed</h3>
+
+  <p>Two very different things can go wrong and they must not be confused. Either the
+    service <em>looked</em> and could not confirm the person, or the lookup
+    <em>never happened at all</em>. The screen tells you which, and what to do next.</p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>What you see</th><th>What it means</th><th>Your next move</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Cannot verify</b> &mdash; no matching record</td>
+          <td>eVerify answered: no record fits these details.</td>
+          <td>Fix a typo, or start over.</td>
+        </tr>
+        <tr>
+          <td><b>Cannot verify</b> &mdash; not confirmed</td>
+          <td>A record was found and was not confirmed.</td>
+          <td>Start over. Retrying returns the same answer.</td>
+        </tr>
+        <tr>
+          <td><b>Not completed</b> &mdash; service error</td>
+          <td>The lookup never reached eVerify, or eVerify refused this site's
+            credentials. Nothing was looked up about this person.</td>
+          <td>Try again with the same details. If it repeats, tell an administrator.</td>
+        </tr>
+        <tr>
+          <td><b>Not completed</b> &mdash; camera cancelled</td>
+          <td>The face check was closed before it finished.</td>
+          <td>Try again with the same details.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure class="screen">
+    <div class="chrome">
+      <div class="tabs">
+        <span class="tab"><span class="fav">V</span><span class="tt">Verify: National ID</span><span class="x">&#10005;</span></span>
+        <span class="newtab">+</span>
+        <span class="wc"><i class="min"></i><i class="max"></i><i class="cls"></i></span>
+      </div>
+      <div class="bar">
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg><svg class="ic dim" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg><svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13.2 2.2v3h-3"/></svg>
+        <span class="omni"><svg class="ic" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.6" y="7" width="8.8" height="6.4" rx="1.3"/><path d="M5.6 7V5.4a2.4 2.4 0 0 1 4.8 0V7"/></svg><span class="u"><b>verify.example.org</b><span>/app/</span></span></span>
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.6l1.65 3.35 3.7.55-2.67 2.6.63 3.68L8 11.05 4.69 12.78l.63-3.68-2.67-2.6 3.7-.55z"/></svg><span class="pfp"></span><span class="kebab"><i></i><i></i><i></i></span>
+      </div>
+    </div>
+    <div class="ui">
+      <div class="u-card" style="border-color:#dc3545;">
+        <div style="display:flex; gap:.6rem; align-items:flex-start; margin-bottom:.6rem;">
+          <span style="width:26px; height:26px; border-radius:50%; background:#fdecea; color:#dc3545; display:grid; place-items:center; font-weight:700; flex:0 0 auto;">&times;</span>
+          <div>
+            <b style="color:#dc3545; font-size:1.05em;">Cannot verify this person</b>
+            <p style="margin:.15rem 0 0;">eVerify found no record matching these details.</p>
+            <p class="u-hint" style="margin:.15rem 0 0;">Check for a typing mistake, or start over with the next person.</p>
+          </div>
+        </div>
+        <table class="u-tab" style="margin-bottom:.5rem;">
+          <tr><th style="width:38%;">Searched for</th><td>LISA ROSE REYES CRUZ &middot; 03/14/1988</td></tr>
+          <tr><th>Face check</th><td>Confirmed</td></tr>
+          <tr><th>When</th><td>04/09/2026 10:42 AM</td></tr>
+        </table>
+        <div class="u-btns" style="justify-content:flex-end;">
+          <span class="u-btn sec"><span class="pin" style="margin-right:.35rem;">1</span> Edit Details</span>
+          <span class="u-btn danger"><span class="pin" style="margin-right:.35rem;">2</span> Start Over</span>
+        </div>
+      </div>
+      <div class="u-card">
+        <div class="u-h2">Step 2: Verify Your Identity</div>
+        <div class="u-status ok" style="display:flex; align-items:center; gap:.5rem;">
+          <span class="pin" style="background:#28a745;">3</span>
+          <span style="flex:1;">Face check confirmed &mdash; usable for <b>2:41</b></span>
+          <span class="u-btn sm" style="background:#28a745;">Verify Without New Face Scan</span>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>The outcome screen</b> replaces the two step cards rather than sitting
+      under them, so a failed verification cannot be half-read and left on the screen for
+      the next person.</figcaption>
+  </figure>
+  <ol class="legend">
+    <li>Keeps everything you typed and puts you back on the form.</li>
+    <li>Keeps nothing, and drops the held face check.</li>
+    <li>Offered only while a face check is held and the form has enough in it to send.
+      It is <em>withdrawn</em> rather than greyed out when it cannot be used.</li>
+  </ol>
+
+  <p>The screen shows what was searched for, the time, and the outcome. Two buttons close
+    it, and they are not the same:</p>
+  <ul class="plain">
+    <li><kbd>Edit Details</kbd> &mdash; keeps everything you typed and puts you back on the
+      form. Use it for a typo.</li>
+    <li><kbd>Start Over</kbd> &mdash; keeps nothing. Use it for the next person.</li>
+  </ul>
+
+  <div class="note">
+    <span class="lab">The face check is held for three minutes</span>
+    <p>A wrong middle name is usually a typo, and the person who just passed the face check
+      is still standing there. So after a failed lookup, Step 2 offers
+      <kbd>Verify Without New Face Scan</kbd> with a countdown: correct the details and send
+      them again with the same face check, no second camera run.</p>
+    <p>It is withdrawn the moment it cannot be used &mdash; when the window runs out, when
+      the form no longer has enough in it to send, when the verification succeeds, and
+      always when you press <kbd>Start Over</kbd>. <strong>Start Over means the next person,
+      and the next person's face has not been checked.</strong></p>
+  </div>
+
+  <p>Nothing on this page clears itself and no message disappears on a timer. Every error box
+    has a dismiss on it; a message that vanishes while somebody is reading it is not a
+    feature.</p>
+</section>
+
+<section id="s23">
+  <h3><span class="n">2.3</span>The verification document</h3>
+  <div class="where"><span class="k">Where</span><span class="v">After a successful verification</span></div>
+
+  <p>The result page shows the sheet exactly as it will print. Above it:</p>
+  <ol class="steps">
+    <li>Choose a <strong>transaction type</strong> &mdash; type to search the list your
+      organization keeps. <kbd>Log Transaction</kbd> stays disabled until you have picked
+      one.</li>
+    <li>Press <kbd>Log Transaction</kbd>. This is what writes the record and mints the
+      offline credential printed on the card.</li>
+    <li>Then <kbd>Print Document</kbd> or <kbd>Save as PDF</kbd>, and &mdash; if the holder
+      wants it on their phone &mdash; the small <em>Send to phone</em> code beside those
+      buttons (<a href="#s24">2.4</a>).</li>
+  </ol>
+
+  <figure class="screen">
+    <div class="chrome">
+      <div class="tabs">
+        <span class="tab"><span class="fav">V</span><span class="tt">Verification Document</span><span class="x">&#10005;</span></span>
+        <span class="newtab">+</span>
+        <span class="wc"><i class="min"></i><i class="max"></i><i class="cls"></i></span>
+      </div>
+      <div class="bar">
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg><svg class="ic dim" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg><svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13.2 2.2v3h-3"/></svg>
+        <span class="omni"><svg class="ic" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.6" y="7" width="8.8" height="6.4" rx="1.3"/><path d="M5.6 7V5.4a2.4 2.4 0 0 1 4.8 0V7"/></svg><span class="u"><b>verify.example.org</b><span>/app/document/</span></span></span>
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.6l1.65 3.35 3.7.55-2.67 2.6.63 3.68L8 11.05 4.69 12.78l.63-3.68-2.67-2.6 3.7-.55z"/></svg><span class="pfp"></span><span class="kebab"><i></i><i></i><i></i></span>
+      </div>
+    </div>
+    <div class="ui">
+      <div class="u-hint" style="margin-bottom:.3rem;">Before logging</div>
+      <div class="u-card" style="display:flex; gap:.6rem; align-items:flex-end;">
+        <div class="u-fg" style="flex:1; margin:0;">
+          <span class="u-lab">Transaction Type</span>
+          <div class="u-in ph" style="margin:0;">Search or select transaction type&hellip;</div>
+        </div>
+        <span class="u-btn dis">Log Transaction</span>
+      </div>
+      <div class="u-hint" style="margin:.6rem 0 .3rem;">After logging</div>
+      <div class="u-card" style="display:flex; gap:.6rem; align-items:center; flex-wrap:wrap;">
+        <span class="u-btn">Save as PDF</span>
+        <span class="u-btn">Print Document</span>
+        <span style="display:flex; align-items:center; gap:.45rem; border-left:1px solid #e0e0e0; padding-left:.6rem;">
+          <svg class="u-qr" width="34" height="34" viewBox="0 0 21 21" shape-rendering="crispEdges" aria-hidden="true">
+            <rect width="21" height="21" fill="#fff"></rect>
+            <rect x="1" y="1" width="19" height="19" fill="url(#qp)"></rect>
+            <rect x="0" y="0" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="2" width="3" height="3" fill="#111"></rect>
+            <rect x="14" y="0" width="7" height="7" fill="#fff"></rect><rect x="14.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="16" y="2" width="3" height="3" fill="#111"></rect>
+            <rect x="0" y="14" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="14.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="16" width="3" height="3" fill="#111"></rect>
+          </svg>
+          <span style="font-size:.88em; line-height:1.3;"><b style="color:#00386a;">Send to phone</b><br>
+            <span class="u-hint">Scan to save the card to Photos</span></span>
+        </span>
+      </div>
+    </div>
+    <figcaption><b>The controls above the document.</b> <em>Log Transaction</em> stays grey
+      until a transaction type is chosen; the print buttons and the hand-off code appear only
+      after it is pressed.</figcaption>
+  </figure>
+
+  <h4>What is on the sheet</h4>
+  <p>The sheet names the holder <strong>once</strong>, at the top &mdash; portrait, full name
+    and both ID numbers &mdash; and only then lists the fields. It is drawn in the same ink as
+    the card the holder carries on their phone, so the paper and the phone describe the person
+    the same way.</p>
+
+  <div class="sheet-fig">
+    <div class="a4" aria-hidden="true">
+      <div class="band hd">National ID Authentication Result</div>
+      <div class="hero">
+        <span class="fc"></span>
+        <span class="nm"></span>
+        <span class="id"></span>
+      </div>
+      <div class="rule"></div>
+      <div class="band" style="height:9px;"></div>
+      <div class="rows"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="foot">
+        <div class="lines"><i></i><i></i><i style="width:60%;"></i></div>
+        <div class="seal">PSA</div>
+        <svg width="22" height="22" viewBox="0 0 21 21" shape-rendering="crispEdges" aria-hidden="true">
+            <rect width="21" height="21" fill="#fff"></rect>
+            <rect x="1" y="1" width="19" height="19" fill="url(#qp)"></rect>
+            <rect x="0" y="0" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="2" width="3" height="3" fill="#111"></rect>
+            <rect x="14" y="0" width="7" height="7" fill="#fff"></rect><rect x="14.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="16" y="2" width="3" height="3" fill="#111"></rect>
+            <rect x="0" y="14" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="14.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="16" width="3" height="3" fill="#111"></rect>
+          </svg>
+      </div>
+      <div class="cut">
+        <div class="card">
+          <svg width="40" height="40" viewBox="0 0 21 21" shape-rendering="crispEdges" aria-hidden="true">
+            <rect width="21" height="21" fill="#fff"></rect>
+            <rect x="1" y="1" width="19" height="19" fill="url(#qp)"></rect>
+            <rect x="0" y="0" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="2" width="3" height="3" fill="#111"></rect>
+            <rect x="14" y="0" width="7" height="7" fill="#fff"></rect><rect x="14.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="16" y="2" width="3" height="3" fill="#111"></rect>
+            <rect x="0" y="14" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="14.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="16" width="3" height="3" fill="#111"></rect>
+          </svg>
+          <svg width="40" height="40" viewBox="0 0 21 21" shape-rendering="crispEdges" aria-hidden="true">
+            <rect width="21" height="21" fill="#fff"></rect>
+            <rect x="1" y="1" width="19" height="19" fill="url(#qp)"></rect>
+            <rect x="0" y="0" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="2" width="3" height="3" fill="#111"></rect>
+            <rect x="14" y="0" width="7" height="7" fill="#fff"></rect><rect x="14.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="16" y="2" width="3" height="3" fill="#111"></rect>
+            <rect x="0" y="14" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="14.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="16" width="3" height="3" fill="#111"></rect>
+          </svg>
+        </div>
+      </div>
+    </div>
+    <dl class="sheet-key">
+      <dt>Header</dt>
+      <dd>The National ID eVerify lockup, the words <em>National ID Authentication Result</em>,
+        and your organization's name and mark.</dd>
+      <dt>The holder, stated once</dt>
+      <dd>The portrait, the full name on one line, and both ID numbers beneath it, closed by a
+        blue rule. The portrait is the thing you compare against the face at the counter, so it
+        is the <b>last</b> element to give way and never prints smaller than <b>16 mm</b>.</dd>
+      <dt>Transaction type, then the fields</dt>
+      <dd>Which fields, in which order, under which names, is a site administrator's setting
+        &mdash; not a fixed list. The holder's name and ID numbers are <em>not</em> repeated
+        here; they have already been stated above.</dd>
+      <dt>Footer &mdash; seal and small QR</dt>
+      <dd>Signature lines on the left; the PSA seal and a <b>20 mm</b> QR on the right. That
+        small square carries only the transaction number and is the <em>online</em> check any
+        webcam can read across a counter.</dd>
+      <dt>Below the cut line &mdash; the card</dt>
+      <dd>Printed on its side, with two <b>48.8 mm</b> squares: the offline credential &mdash; a
+        <b>CL03</b> code &mdash; and the holder's portrait. Its header prints the date it expires, 30 days from the
+        verification unless your site sets otherwise. Cut along the marks and it is the same card the holder's phone
+        carries.</dd>
+    </dl>
+  </div>
+
+  <h4>Two layouts, and the sheet picks one for you</h4>
+  <p>The sheet is always one A4 page. The page is <strong>measured</strong> after it is laid
+    out, and if it does not fit, the <em>layout</em> changes rather than the type size.</p>
+
+  <div class="sheet-fig">
+    <div class="a4 tight" aria-hidden="true">
+      <div class="band hd">National ID Authentication Result</div>
+      <div class="hero">
+        <span class="fc"></span>
+        <span class="txt"><span class="nm"></span><span class="id"></span></span>
+      </div>
+      <div class="rule"></div>
+      <div class="band" style="height:9px;"></div>
+      <div class="rows"><i></i><i></i><i class="wide"></i><i class="wide"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="foot">
+        <div class="lines"><i></i><i></i><i style="width:60%;"></i></div>
+        <div class="seal">PSA</div>
+        <svg width="22" height="22" viewBox="0 0 21 21" shape-rendering="crispEdges" aria-hidden="true">
+            <rect width="21" height="21" fill="#fff"></rect>
+            <rect x="1" y="1" width="19" height="19" fill="url(#qp)"></rect>
+            <rect x="0" y="0" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="2" width="3" height="3" fill="#111"></rect>
+            <rect x="14" y="0" width="7" height="7" fill="#fff"></rect><rect x="14.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="16" y="2" width="3" height="3" fill="#111"></rect>
+            <rect x="0" y="14" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="14.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="16" width="3" height="3" fill="#111"></rect>
+          </svg>
+      </div>
+      <div class="cut">
+        <div class="card">
+          <svg width="40" height="40" viewBox="0 0 21 21" shape-rendering="crispEdges" aria-hidden="true">
+            <rect width="21" height="21" fill="#fff"></rect>
+            <rect x="1" y="1" width="19" height="19" fill="url(#qp)"></rect>
+            <rect x="0" y="0" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="2" width="3" height="3" fill="#111"></rect>
+            <rect x="14" y="0" width="7" height="7" fill="#fff"></rect><rect x="14.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="16" y="2" width="3" height="3" fill="#111"></rect>
+            <rect x="0" y="14" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="14.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="16" width="3" height="3" fill="#111"></rect>
+          </svg>
+          <svg width="40" height="40" viewBox="0 0 21 21" shape-rendering="crispEdges" aria-hidden="true">
+            <rect width="21" height="21" fill="#fff"></rect>
+            <rect x="1" y="1" width="19" height="19" fill="url(#qp)"></rect>
+            <rect x="0" y="0" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="2" width="3" height="3" fill="#111"></rect>
+            <rect x="14" y="0" width="7" height="7" fill="#fff"></rect><rect x="14.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="16" y="2" width="3" height="3" fill="#111"></rect>
+            <rect x="0" y="14" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="14.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="16" width="3" height="3" fill="#111"></rect>
+          </svg>
+        </div>
+      </div>
+    </div>
+    <dl class="sheet-key">
+      <dt>The second form</dt>
+      <dd>An organization printing a very long list &mdash; more than about twenty-two fields
+        &mdash; gets this one instead. The portrait moves <b>beside</b> the name rather than
+        above it, and the field list runs in <b>two columns</b>. A long value, such as an
+        address, still spans the full width rather than wrapping three times in a narrow
+        column.</dd>
+      <dt>Why it is the fallback and not the layout</dt>
+      <dd>Two columns cost reading order: one column makes the order a site administrator
+        arranged unambiguous. An organization whose list fits never sees this form.</dd>
+      <dt>It prints larger, not smaller</dt>
+      <dd>The busiest documents now print <em>bigger</em> than they used to: halving the row
+        count gives back more room than shrinking the type ever did. A 36-field sheet prints
+        at about <b>7.8 pt</b> against the old 6 pt, with a <b>28 mm</b> portrait against
+        8 mm.</dd>
+    </dl>
+  </div>
+
+  <div class="note cost">
+    <span class="lab">A document without a card is still a document</span>
+    <p>If the offline credential could not be minted, the sheet prints without the cut-out
+      card and its two squares. Everything else &mdash; the record, the seal, the small
+      validation QR &mdash; is unchanged and the document is still valid. Losing the offline
+      half is a far smaller failure than losing the record that somebody was verified.</p>
+  </div>
+
+  <div class="note">
+    <span class="lab">The preview on screen is the page the printer gives you</span>
+    <p>The document on screen sits on a drawn sheet of A4, held away from the edge by the
+      <em>same</em> margin the printer applies &mdash; measured off the PDF, not assumed. What
+      you check before pressing <kbd>Print Document</kbd> is therefore what comes out: if the
+      sheet looks right in the browser, it is right on paper. The two agree to within
+      a twentieth of a millimetre.</p>
+  </div>
+
+  <p>All of it is measured on rendered pages rather than estimated, and the figures are in
+    <a href="#s52">5.2</a>.</p>
+</section>
+
+<section id="s24">
+  <h3><span class="n">2.4</span>Send the card to the holder's phone</h3>
+
+  <p>Once the transaction is logged, a small QR appears beside the print buttons, labelled
+    <em>Send to phone &mdash; scan to save the card to Photos</em>. The holder points their
+    <strong>own</strong> phone camera at it, from across the desk. Nothing is typed, nothing
+    is installed, and they do not sign in to anything.</p>
+
+  <ol class="steps">
+    <li>They scan it and a page opens: <em>Your verification card</em>.</li>
+    <li>On an iPhone they press <kbd>Save to Photos</kbd>. On Android the same button
+      downloads the image, and the phone's own notification opens it in the gallery.</li>
+    <li>On an iPhone there is also <kbd>Add to Apple Wallet</kbd>, above it, when this
+      installation is set up to issue passes. See below &mdash; it is a different object from
+      the picture, and the holder may reasonably want both.</li>
+    <li>If no button appears, they press and hold the card and choose <em>Add to Photos</em>
+      (iOS) or <em>Download image</em> (Android). The page says so on its face.</li>
+  </ol>
+
+  <figure class="screen phone-fig">
+    <div class="chrome mobile">
+      <div class="bar">
+        <span class="omni"><svg class="ic" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.6" y="7" width="8.8" height="6.4" rx="1.3"/><path d="M5.6 7V5.4a2.4 2.4 0 0 1 4.8 0V7"/></svg><span class="u"><b>verify.example.org</b></span></span>
+        <span style="border:1.4px solid #5f6368; border-radius:3px; width:13px; height:13px; font-size:8px; line-height:11px; text-align:center; color:#5f6368; flex:0 0 auto;">3</span>
+        <span class="kebab"><i></i><i></i><i></i></span>
+      </div>
+    </div>
+    <div class="ui">
+      <div class="u-phone">
+        <div style="font-weight:700; color:#00386a; font-size:1.02em;">Your verification card</div>
+        <div class="u-hint" style="margin:.15rem 0 .5rem;">Save it to your photos. It holds
+          both codes, so it can be checked without an internet connection.</div>
+        <div style="border:1px solid #cfd7e0; border-radius:4px; padding:.4rem; background:#fff;">
+          <div style="display:flex; align-items:center; gap:.35rem; justify-content:center; margin-bottom:.35rem;">
+            <span class="u-face" style="width:24px; height:24px;"></span>
+            <span style="font-size:.82em; text-align:left; line-height:1.25;">
+              <b>LISA ROSE REYES CRUZ</b><br>
+              <span class="u-hint">0000-1111-2222-3333 &middot; SMP0001</span></span>
+          </div>
+          <div style="display:flex; gap:.3rem; justify-content:center;">
+            <svg width="52" height="52" viewBox="0 0 21 21" shape-rendering="crispEdges" aria-hidden="true">
+              <rect width="21" height="21" fill="#fff"></rect><rect x="1" y="1" width="19" height="19" fill="url(#qp)"></rect>
+              <rect x="0" y="0" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="2" width="3" height="3" fill="#111"></rect>
+              <rect x="14" y="0" width="7" height="7" fill="#fff"></rect><rect x="14.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="16" y="2" width="3" height="3" fill="#111"></rect>
+              <rect x="0" y="14" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="14.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="16" width="3" height="3" fill="#111"></rect>
+            </svg>
+            <svg width="52" height="52" viewBox="0 0 21 21" shape-rendering="crispEdges" aria-hidden="true">
+              <rect width="21" height="21" fill="#fff"></rect><rect x="1" y="1" width="19" height="19" fill="url(#qp)"></rect>
+              <rect x="0" y="0" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="2" width="3" height="3" fill="#111"></rect>
+              <rect x="14" y="0" width="7" height="7" fill="#fff"></rect><rect x="14.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="16" y="2" width="3" height="3" fill="#111"></rect>
+              <rect x="0" y="14" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="14.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="16" width="3" height="3" fill="#111"></rect>
+            </svg>
+          </div>
+          <div style="font-size:.72em; color:#8a95a1; margin-top:.2rem; display:flex; justify-content:space-around;">
+            <span>CREDENTIAL</span><span>PORTRAIT</span>
+          </div>
+        </div>
+        <div class="u-btn wide" style="margin-top:.5rem; background:#000; border-color:#000; display:flex; align-items:center; justify-content:center; gap:.35rem;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="2.5" y="5.5" width="19" height="14" rx="3"></rect><path d="M2.5 10.5h19"></path><path d="M16.5 15h2"></path>
+          </svg>Add to Apple Wallet</div>
+        <div class="u-btn wide" style="margin-top:.35rem;">Save to Photos</div>
+        <div class="u-hint" style="margin-top:.35rem;">This link stops working when the
+          counter closes it, and in any case a few minutes from now.</div>
+      </div>
+    </div>
+    <figcaption><b>What the holder sees</b> after scanning the <em>Send to phone</em> code
+      with their own camera. No app, no sign-in, nothing typed. The black button appears on
+      iPhones only, and only where the installation holds an Apple pass certificate.</figcaption>
+  </figure>
+
+  <div class="note">
+    <span class="lab">The card in Apple Wallet</span>
+    <p><kbd>Add to Apple Wallet</kbd> puts the verification in the holder's wallet, where it
+      sits indefinitely rather than for the few minutes the link lives. It is
+      <em>one pass</em>: the credential square, which a checkpoint verifies with no network,
+      and the holder's photo. It is the same pass a holder gets from idmanager.</p>
+    <p><strong>A pass shows exactly one barcode</strong>, so the credential square is the
+      barcode and the face rides as the pass's picture. Where the verification carried no
+      face, the pass has no photo.</p>
+    <p><strong>The verifier app does not check the photo on a pass.</strong> It is the face
+      this verification bound to the credential, but a picture on a phone can be imitated.
+      To have the app check the face, scan the <b>Portrait</b> square on the saved card image
+      or on the printed document: the app shows that face only once it matches the
+      credential.</p>
+    <p>The button is drawn only on iPhones, and only when a site administrator has set the
+      installation up to issue passes. Where either is not so, there is simply no button
+      rather than one that fails when pressed. Android has no equivalent.</p>
+  </div>
+
+  <div class="note cost">
+    <span class="lab">Five minutes, and it closes when you leave</span>
+    <p>The link is unguessable, expires within a few minutes, and is released the moment you
+      navigate away from the document page. That is deliberate: it is the one address on
+      this site that hands over somebody's identity without a sign-in, and the short life is
+      most of what keeps that safe. <strong>Wait for the holder to save the card before you
+      move on.</strong> If it lapses, log nothing again &mdash; simply reopen the document
+      is not possible, so hand them the printed card instead.</p>
+  </div>
+
+  <p>What is on the card is decided here, not on the phone: your organization's field list,
+    and your Demo Mode setting. A card saved while you are presenting is the redacted one.</p>
+</section>
+
+<section id="s25">
+  <h3><span class="n">2.5</span>Validate a document somebody else printed</h3>
+  <div class="where"><span class="k">Where</span><span class="v">Validate</span></div>
+
+  <p>Press <kbd>Scan QR Code</kbd> and point the camera at either the small square in the
+    document's footer or the <strong>credential square</strong> on the cut-out card. The
+    record comes up: who was verified, by whom, where, when, and under which transaction
+    type. The camera gives up after thirty seconds, and <kbd>Cancel</kbd> stops it sooner.</p>
+
+  <figure class="screen">
+    <div class="chrome">
+      <div class="tabs">
+        <span class="tab"><span class="fav">V</span><span class="tt">Verify: Validate</span><span class="x">&#10005;</span></span>
+        <span class="newtab">+</span>
+        <span class="wc"><i class="min"></i><i class="max"></i><i class="cls"></i></span>
+      </div>
+      <div class="bar">
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg><svg class="ic dim" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg><svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13.2 2.2v3h-3"/></svg>
+        <span class="omni"><svg class="ic" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.6" y="7" width="8.8" height="6.4" rx="1.3"/><path d="M5.6 7V5.4a2.4 2.4 0 0 1 4.8 0V7"/></svg><span class="u"><b>verify.example.org</b><span>/validate/</span></span></span>
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.6l1.65 3.35 3.7.55-2.67 2.6.63 3.68L8 11.05 4.69 12.78l.63-3.68-2.67-2.6 3.7-.55z"/></svg><span class="pfp"></span><span class="kebab"><i></i><i></i><i></i></span>
+      </div>
+    </div>
+    <div class="ui">
+      <div class="u-card">
+        <div class="u-h2">Validate Transaction</div>
+        <div style="text-align:center; border:1px dashed #cfd7e0; border-radius:6px; padding:.7rem;">
+          <p class="u-hint">Scan the QR on a verification document, or the credential square
+            on its cut-out card, to validate the record.</p>
+          <span class="u-btn" style="margin-top:.2rem;">Scan QR Code</span>
+        </div>
+      </div>
+      <div class="u-card">
+        <div class="u-status ok">Transaction found &mdash; verified 04/09/2026 10:44 AM</div>
+        <table class="u-tab">
+          <tr><th style="width:40%;">Name</th><td>LISA ROSE REYES CRUZ</td></tr>
+          <tr><th>National ID card number</th><td>0000-1111-2222-3333</td></tr>
+          <tr><th>Digital National ID</th><td>SMP0001</td></tr>
+          <tr><th>Organization</th><td>Philippine Statistics Authority</td></tr>
+          <tr><th>Location</th><td>Window 3</td></tr>
+          <tr><th>Transaction type</th><td>Civil registry document request</td></tr>
+          <tr><th>Result</th><td><span class="u-badge ok">success</span></td></tr>
+        </table>
+      </div>
+    </div>
+    <figcaption><b>Validate</b>, with a record pulled up. The camera gives up after thirty
+      seconds; <em>Cancel</em> stops it sooner.</figcaption>
+  </figure>
+
+  <p>The card has two squares the same size and it is easy to point at the wrong one. If you
+    scan the <strong>portrait</strong> square the page tells you so and keeps looking &mdash;
+    the other square is three centimetres away. There is nothing to look up in the portrait
+    square; it carries the face, not the record.</p>
+
+  <div class="note">
+    <span class="lab">This page needs the network. The phone does not.</span>
+    <p>Validate is the online check, and anybody with a camera can do it from the printed
+      page. The offline check is the paired phone in <a href="#s26">2.6</a>, which validates the
+      card's CL03 credential square with no connection at all.</p>
+  </div>
+</section>
+
+<section id="s26">
+  <h3><span class="n">2.6</span>Your paired phones</h3>
+  <div class="where"><span class="k">Where</span><span class="v">Devices</span></div>
+
+  <p>A paired phone running the verifier app can open a verification card with <strong>no
+    network</strong> &mdash; at a checkpoint, in a lobby, in a field office. This site and the
+    app together are the offline verification system, also called the <b>CL03
+    implementation</b>. Pairing,
+    refreshing and re-keying are all done by the phone scanning a code from this page.
+    Nothing is typed into the phone but, if a camera will not cooperate, the code is printed
+    beside the square.</p>
+
+  <h4>Pair a phone</h4>
+  <ol class="steps">
+    <li>Name it &mdash; something you will recognise in a list, such as
+      <em>Field team 3 &mdash; iPhone 14</em>.</li>
+    <li>Press <kbd>Pair a phone</kbd>. A square and a one-time code appear, with how long
+      they last.</li>
+    <li>Scan it with the verifier app. The phone generates its own key, which never leaves
+      it, and pulls everything else over an encrypted connection.</li>
+  </ol>
+  <figure class="screen">
+    <div class="chrome">
+      <div class="tabs">
+        <span class="tab"><span class="fav">V</span><span class="tt">Devices</span><span class="x">&#10005;</span></span>
+        <span class="newtab">+</span>
+        <span class="wc"><i class="min"></i><i class="max"></i><i class="cls"></i></span>
+      </div>
+      <div class="bar">
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg><svg class="ic dim" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg><svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13.2 2.2v3h-3"/></svg>
+        <span class="omni"><svg class="ic" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.6" y="7" width="8.8" height="6.4" rx="1.3"/><path d="M5.6 7V5.4a2.4 2.4 0 0 1 4.8 0V7"/></svg><span class="u"><b>verify.example.org</b><span>/app/devices/</span></span></span>
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.6l1.65 3.35 3.7.55-2.67 2.6.63 3.68L8 11.05 4.69 12.78l.63-3.68-2.67-2.6 3.7-.55z"/></svg><span class="pfp"></span><span class="kebab"><i></i><i></i><i></i></span>
+      </div>
+    </div>
+    <div class="ui">
+      <div class="u-card">
+        <div class="u-h2">Pair a phone</div>
+        <div style="display:flex; gap:.7rem; align-items:flex-start; flex-wrap:wrap;">
+          <div style="border:1px solid #e0e0e0; border-radius:6px; padding:.4rem; background:#fff;">
+            <svg width="72" height="72" viewBox="0 0 21 21" shape-rendering="crispEdges" aria-hidden="true">
+              <rect width="21" height="21" fill="#fff"></rect><rect x="1" y="1" width="19" height="19" fill="url(#qp)"></rect>
+              <rect x="0" y="0" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="2" width="3" height="3" fill="#111"></rect>
+              <rect x="14" y="0" width="7" height="7" fill="#fff"></rect><rect x="14.5" y="0.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="16" y="2" width="3" height="3" fill="#111"></rect>
+              <rect x="0" y="14" width="7" height="7" fill="#fff"></rect><rect x="0.5" y="14.5" width="6" height="6" fill="none" stroke="#111"></rect><rect x="2" y="16" width="3" height="3" fill="#111"></rect>
+            </svg>
+          </div>
+          <div style="flex:1; min-width:12rem;">
+            <p>Scan this with the verifier app.</p>
+            <p class="u-hint" style="margin-bottom:.1rem;">Or type this code</p>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:1.05em; letter-spacing:.06em; color:#00386a; font-weight:600;">K7QP-3M2X-8VBD</div>
+            <p class="u-hint" style="margin-top:.3rem;">Works once, and expires in 9 minutes.</p>
+          </div>
+        </div>
+      </div>
+      <div class="u-card">
+        <div class="u-h2">Your devices</div>
+        <table class="u-tab">
+          <thead><tr><th>Device</th><th>Access</th><th>Status</th><th>Last sync</th><th class="r"></th></tr></thead>
+          <tbody>
+            <tr>
+              <td><b>Field team 3 &mdash; iPhone 14</b><br><span class="u-hint" style="font-family:'IBM Plex Mono',monospace;">3f9c-1a70-&hellip;</span></td>
+              <td><span class="u-badge ok">Holder details</span></td>
+              <td><span class="u-badge ok">Active</span></td>
+              <td>2 hours ago</td>
+              <td class="r"><span class="u-btn sm sec">Sync</span> <span class="u-btn sm sec">Re-key</span> <span class="u-btn sm danger">Revoke</span></td>
+            </tr>
+            <tr>
+              <td><b>Lobby desk &mdash; Android</b><br><span class="u-hint" style="font-family:'IBM Plex Mono',monospace;">8b21-44de-&hellip;</span></td>
+              <td><span class="u-badge opr">Document only</span></td>
+              <td><span class="u-badge" style="background:#fff4e0; color:#8a5a06;">Keys stale</span></td>
+              <td>6 weeks ago</td>
+              <td class="r"><span class="u-btn sm">Sync</span> <span class="u-btn sm sec">Re-key</span> <span class="u-btn sm danger">Revoke</span></td>
+            </tr>
+            <tr style="opacity:.55;">
+              <td><b>Old handset</b><br><span class="u-hint" style="font-family:'IBM Plex Mono',monospace;">c04a-9f13-&hellip;</span></td>
+              <td><span class="u-badge opr">Document only</span></td>
+              <td><span class="u-badge no">Revoked</span></td>
+              <td>&mdash;</td>
+              <td class="r"><span class="u-hint">no actions</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <figcaption><b>Devices.</b> The second row is the ordinary case for a phone that has been
+      in a drawer: press <em>Sync</em> and scan &mdash; it does not need revoking.</figcaption>
+  </figure>
+
+  <p>The code works <strong>once</strong> and expires. It carries only this server's address
+    and a one-time password &mdash; there is no key and no personal data in the square, which
+    is why it stays small enough to scan reliably.</p>
+
+  <h4>The list, and what the states mean</h4>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Column</th><th>Reads</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td rowspan="2"><b>Access</b></td><td><span class="pill ok">Holder details</span></td><td>Your phones can read the person's details out of a card.</td></tr>
+        <tr><td><span class="pill off">Document only</span></td><td>Your phones can confirm a document is genuine but cannot read the details. A site administrator changes this.</td></tr>
+        <tr><td rowspan="3"><b>Status</b></td><td><span class="pill ok">Active</span></td><td>Paired and holding current keys.</td></tr>
+        <tr><td><span class="pill warn">Keys stale</span></td><td>Its keys have run out or were replaced. Press <kbd>Sync</kbd> and scan. <strong>This is not a revocation</strong> &mdash; do not revoke a phone that only needs opening.</td></tr>
+        <tr><td><span class="pill off">Revoked</span></td><td>Withdrawn. It receives nothing further and what it holds expires.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>The three buttons</h4>
+  <ul class="plain">
+    <li><kbd>Sync</kbd> &mdash; shows a square the phone scans to pull fresh keys. Use it for
+      <em>Keys stale</em>, or after a revocation elsewhere that this phone should know about.</li>
+    <li><kbd>Re-key</kbd> &mdash; for a phone that was reinstalled, restored from a backup, or
+      replaced its key for any reason. It rebinds the <em>same</em> device record to a new
+      key, so the phone keeps its name and its history. It reads <em>Keys stale</em> until it
+      syncs, which is honest: everything it held was locked to the key it just replaced.</li>
+    <li><kbd>Revoke</kbd> &mdash; for a lost or retired handset. <strong>This cannot be
+      undone</strong>, and a revoked phone cannot be re-keyed. Pair a new one.</li>
+  </ul>
+
+  <div class="note">
+    <span class="lab">Access follows you, not the handset</span>
+    <p>Whether your phones may read holder details is set on <em>you</em>, by a site
+      administrator. Withdrawing it reaches every phone you own at its next sync, rather than
+      needing each one found and edited &mdash; and a phone that may not read details is
+      never sent the key that would let it, so the separation is cryptographic rather than a
+      setting the app could be talked out of.</p>
+  </div>
+
+  <div class="note cost">
+    <span class="lab">If the page warns about the address</span>
+    <p>The square carries the address this page was reached at. If that address is one the
+      phone cannot reach &mdash; a local-only address, or a plain <code>http</code> one
+      &mdash; the page says so plainly instead of drawing a code that would fail silently
+      inside the phone. Open the site at its proper <code>https</code> address and generate
+      the code again, and tell whoever runs the deployment.</p>
+  </div>
+</section>
+
+<section id="s27">
+  <h3><span class="n">2.7</span>Your own settings</h3>
+  <div class="where"><span class="k">Where</span><span class="v">Setup</span></div>
+
+  <p>Two things here are yours alone.</p>
+  <p><strong>Demo Mode</strong> &mdash; described in <a href="#s15">1.5</a>. One switch,
+    following you everywhere.</p>
+  <p><strong>Fingerprint reader</strong> &mdash; the reader attached to the workstation you
+    sit at. Fill in the reader's WebAPI endpoint (a full URL including
+    <code>http://</code> or <code>https://</code>) and its serial number. Leave the serial
+    as <code>0</code> when there is no reader: the Verify page offers the fingerprint button
+    only once a serial number is set.</p>
+  <figure class="screen">
+    <div class="chrome">
+      <div class="tabs">
+        <span class="tab"><span class="fav">V</span><span class="tt">Verify: Setup</span><span class="x">&#10005;</span></span>
+        <span class="newtab">+</span>
+        <span class="wc"><i class="min"></i><i class="max"></i><i class="cls"></i></span>
+      </div>
+      <div class="bar">
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg><svg class="ic dim" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg><svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13.2 2.2v3h-3"/></svg>
+        <span class="omni"><svg class="ic" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.6" y="7" width="8.8" height="6.4" rx="1.3"/><path d="M5.6 7V5.4a2.4 2.4 0 0 1 4.8 0V7"/></svg><span class="u"><b>verify.example.org</b><span>/app/setup/</span></span></span>
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.6l1.65 3.35 3.7.55-2.67 2.6.63 3.68L8 11.05 4.69 12.78l.63-3.68-2.67-2.6 3.7-.55z"/></svg><span class="pfp"></span><span class="kebab"><i></i><i></i><i></i></span>
+      </div>
+    </div>
+    <div class="ui">
+      <div class="u-card">
+        <div class="u-h2">Setup</div>
+        <div style="font-weight:600; color:#00386a; margin-bottom:.4rem;">User Settings</div>
+        <div style="display:flex; align-items:flex-start; gap:.7rem; border-bottom:1px solid #e0e0e0; padding-bottom:.6rem; margin-bottom:.7rem;">
+          <div style="flex:1;">
+            <b>Demo Mode</b>
+            <div class="u-hint">Masks the verification result on screen so a real ID can be
+              shown to an audience. The transaction still logs the real verification.</div>
+          </div>
+          <span class="u-sw"></span>
+        </div>
+        <div style="font-weight:600; color:#00386a; margin-bottom:.4rem;">Fingerprint Authentication</div>
+        <div class="u-fg">
+          <span class="u-lab">Fingerprint Auth WebAPI Endpoint</span>
+          <div class="u-in">http://127.0.0.1:4501/capture</div>
+        </div>
+        <div class="u-fg" style="max-width:14rem;">
+          <span class="u-lab">Serial Number</span>
+          <div class="u-in" style="margin-bottom:.2rem;">0</div>
+          <div class="u-hint">Leave it as <b>0</b> when there is no reader.</div>
+        </div>
+        <div class="u-btn" style="margin-top:.5rem;">Save</div>
+      </div>
+    </div>
+    <figcaption><b>Setup.</b> Both settings here are yours alone. A site administrator sees
+      a further <em>Site Administration</em> section below them (<a href="#s46">4.6</a>).</figcaption>
+  </figure>
+
+  <p>The reader belongs to <em>you at this organization</em>. If you also work at another
+    organization, its reader is a separate setting &mdash; switch there and come back to this
+    page. The section only appears once you are inside an organization.</p>
+</section>
+
+<!-- ============================================================ 3 -->
+<div class="part-open" id="p3">
+  <div class="part-num">Part three &middot; <span class="chips" style="display:inline-flex"><span class="chip chip-org">Organization administrator</span></span></div>
+  <h2>Running an organization</h2>
+</div>
+
+<section id="s31">
+  <h3><span class="n">3.1</span>What you administer</h3>
+  <div class="where"><span class="k">Where</span><span class="v">Organization</span><span class="k">Scope</span><span class="v">The organization you are currently working in</span></div>
+
+  <p>The <strong>Organization</strong> tab edits the organization your session is in, and
+    only that one. If you administer two, switch context (<a href="#s13">1.3</a>) and the tab
+    follows you. Each section on the page collapses; open the one you need.</p>
+  <figure class="screen">
+    <div class="chrome">
+      <div class="tabs">
+        <span class="tab"><span class="fav">V</span><span class="tt">Verify: Organization</span><span class="x">&#10005;</span></span>
+        <span class="newtab">+</span>
+        <span class="wc"><i class="min"></i><i class="max"></i><i class="cls"></i></span>
+      </div>
+      <div class="bar">
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg><svg class="ic dim" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg><svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13.2 2.2v3h-3"/></svg>
+        <span class="omni"><svg class="ic" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.6" y="7" width="8.8" height="6.4" rx="1.3"/><path d="M5.6 7V5.4a2.4 2.4 0 0 1 4.8 0V7"/></svg><span class="u"><b>verify.example.org</b><span>/app/admin/</span></span></span>
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.6l1.65 3.35 3.7.55-2.67 2.6.63 3.68L8 11.05 4.69 12.78l.63-3.68-2.67-2.6 3.7-.55z"/></svg><span class="pfp"></span><span class="kebab"><i></i><i></i><i></i></span>
+      </div>
+    </div>
+    <div class="ui">
+      <div class="u-banner">
+        <span class="u-mark">PSA</span>
+        <span><span class="u-orgname">Philippine Statistics Authority</span><br>
+          <span class="u-hint">Civil Registry Services</span></span>
+      </div>
+      <div class="u-card" style="padding:.4rem .9rem;"><div class="u-h2" style="border:none; margin:0; padding:0;">&#9662; Statistics <span class="u-hint" style="font-weight:400;">&mdash; counts for a date range</span></div></div>
+      <div class="u-card" style="padding:.4rem .9rem;"><div class="u-h2" style="border:none; margin:0; padding:0;">&#9656; Export Transactions <span class="u-hint" style="font-weight:400;">&mdash; the log as CSV</span></div></div>
+      <div class="u-card" style="padding:.4rem .9rem;"><div class="u-h2" style="border:none; margin:0; padding:0;">&#9656; Organization Profile <span class="u-hint" style="font-weight:400;">&mdash; name, logo, mark colour</span></div></div>
+      <div class="u-card" style="padding:.4rem .9rem;"><div class="u-h2" style="border:none; margin:0; padding:0;">&#9656; eVerify Credentials <span class="u-hint" style="font-weight:400;">&mdash; the account verifications bill to</span></div></div>
+      <div class="u-card" style="padding:.4rem .9rem;"><div class="u-h2" style="border:none; margin:0; padding:0;">&#9656; Users <span class="u-hint" style="font-weight:400;">&mdash; members and their roles</span></div></div>
+      <div class="u-card" style="padding:.4rem .9rem;"><div class="u-h2" style="border:none; margin:0; padding:0;">&#9656; Locations <span class="u-hint" style="font-weight:400;">&mdash; the counters operators sit at</span></div></div>
+      <div class="u-card" style="padding:.4rem .9rem;"><div class="u-h2" style="border:none; margin:0; padding:0;">&#9656; Transaction Types <span class="u-hint" style="font-weight:400;">&mdash; what a verification was for</span></div></div>
+      <div class="u-card">
+        <div class="u-h2">Statistics</div>
+        <div class="u-tiles">
+          <div class="u-tile"><b>17</b><span>People</span></div>
+          <div class="u-tile"><b>1,204</b><span>Verifications</span></div>
+          <div class="u-tile"><b>1,171</b><span>Successful</span></div>
+          <div class="u-tile"><b>33</b><span>Failed</span></div>
+        </div>
+        <div class="u-btns">
+          <span style="font-size:.9em;">Start Date</span><span class="u-in" style="margin:0;">04/01/2026</span>
+          <span style="font-size:.9em;">End Date</span><span class="u-in" style="margin:0;">04/30/2026</span>
+          <span class="u-btn sm">Filter</span><span class="u-btn sm sec">Clear</span>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>The Organization page</b> is seven collapsing sections. Open the one you
+      need; the rest stay out of the way.</figcaption>
+  </figure>
+
+  <p>You own the daily business: statistics, the export, the organization's appearance, its
+    eVerify account, its people, its counters and its transaction types. Two things are
+    deliberately <em>not</em> yours, and both belong to a site administrator: which fields
+    are printed and kept (<a href="#s44">4.4</a>), and how the whole site signs in
+    (<a href="#s46">4.6</a>).</p>
+</section>
+
+<section id="s32">
+  <h3><span class="n">3.2</span>Statistics</h3>
+  <p>Four counts for a date range you choose: people in the organization, verifications run,
+    those that succeeded, and those that did not. Set <strong>Start Date</strong> and
+    <strong>End Date</strong> and press <kbd>Filter</kbd>; <kbd>Clear</kbd> puts it back to
+    everything.</p>
+</section>
+
+<section id="s33">
+  <h3><span class="n">3.3</span>Export the transaction log</h3>
+  <p>Choose a date range and press <kbd>Export</kbd>. You get a CSV named for the
+    organization and the range, holding one row per verification.</p>
+  <p>Every row starts with the facts that make it a log entry &mdash; the transaction ID, the
+    organization, the operator's National ID number, the location, and whether it was run by
+    a site administrator without a membership here &mdash; then the person's fields, then the
+    timestamp, the result and the transaction type.</p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Column</th><th>Always present</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>TRANSACTION_ID</code></td><td>Yes</td><td>The same number the document's QR carries.</td></tr>
+        <tr><td><code>ORGANIZATION</code>, <code>OPERATOR_NATIONAL_ID_NUMBER</code>, <code>OPERATOR_LOCATION</code></td><td>Yes</td><td>Who ran it and where.</td></tr>
+        <tr><td><code>ACTING_AS_SITE_ADMIN</code></td><td>Yes</td><td><em>Yes</em> when a site administrator ran it without a membership here.</td></tr>
+        <tr><td>The person's fields</td><td>Configured</td><td>Named and ordered exactly as they are on the document. See below.</td></tr>
+        <tr><td><code>VERIFICATION_TIMESTAMP</code></td><td>Yes</td><td>Local time, <code>mm/dd/yyyy hh:mm AM</code>.</td></tr>
+        <tr><td><code>AUTHENTICATION_RESULT</code>, <code>TRANSACTION_TYPE</code></td><td>Yes</td><td>Always recorded &mdash; a log entry that does not say whether it succeeded is not a log entry.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note cost">
+    <span class="lab">Two things to know before wiring this into something</span>
+    <p><strong>The columns follow the document's order</strong>, not a fixed one, and a site
+      administrator can change it. Read the file by its header row, never by column position.</p>
+    <p><strong>The export is never redacted</strong>, even while you are in Demo Mode. It is
+      a data operation, so treat the file as the personal data it is.</p>
+  </div>
+</section>
+
+<section id="s34">
+  <h3><span class="n">3.4</span>Profile and mark</h3>
+  <p>The organization's <strong>name</strong> heads its banner and prints on every document
+    and inside every credential. A <strong>banner subtitle</strong> is optional. A
+    <strong>logo</strong> can be uploaded; without one, the organization's initials are drawn
+    on a coloured square in the <strong>mark colour</strong> you pick.</p>
+  <p>Logos are stored as image data in the organization's own record rather than as a file on
+    a server, so they survive a redeploy and appear identically on every instance. SVG is
+    refused: it can carry script, and this image is printed into a document that leaves the
+    building.</p>
+  <p>Renaming is safe at any time &mdash; the organization's record already owns everything
+    that points at it. Credentials already issued keep the name they were issued under, which
+    is the more truthful answer for a signed document.</p>
+</section>
+
+<section id="s35">
+  <h3><span class="n">3.5</span>eVerify credentials</h3>
+  <p>This is <strong>the account your verifications run against, and bill to</strong>. Base
+    URL, Client ID, Client Secret and Public API Key. Secrets already saved are shown as
+    <em>Stored &mdash; leave blank to keep</em>: they are never sent back to a browser, so
+    leaving the box empty keeps what is stored and typing in it replaces it.</p>
+
+  <div class="note no">
+    <span class="lab">There is no fallback here, deliberately</span>
+    <p>An organization with no eVerify account <strong>refuses to verify</strong>, and says so
+      by name on the Verify page. It does not quietly borrow another organization's account:
+      that would bill one organization's verifications to another, and would make a
+      missing-credentials mistake look exactly like everything working.</p>
+    <p>The account used to <em>sign operators in</em> is a different one, set site-wide
+      (<a href="#s46">4.6</a>). Sign-in happens before anybody has an organization, so there
+      is no organization yet whose account could be used.</p>
+  </div>
+</section>
+
+<section id="s36">
+  <h3><span class="n">3.6</span>People</h3>
+  <p>Members are added by National ID. Enter the <strong>National ID card number</strong>,
+    optionally the <strong>Digital National ID</strong>, choose <strong>Operator</strong> or
+    <strong>Admin</strong>, and press <kbd>Add</kbd>. Search the list by name or by either
+    number; change somebody's role from the dropdown on their row.</p>
+
+  <figure class="screen">
+    <div class="chrome">
+      <div class="tabs">
+        <span class="tab"><span class="fav">V</span><span class="tt">Verify: Organization</span><span class="x">&#10005;</span></span>
+        <span class="newtab">+</span>
+        <span class="wc"><i class="min"></i><i class="max"></i><i class="cls"></i></span>
+      </div>
+      <div class="bar">
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg><svg class="ic dim" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg><svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13.2 2.2v3h-3"/></svg>
+        <span class="omni"><svg class="ic" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.6" y="7" width="8.8" height="6.4" rx="1.3"/><path d="M5.6 7V5.4a2.4 2.4 0 0 1 4.8 0V7"/></svg><span class="u"><b>verify.example.org</b><span>/app/admin/</span> <span style="color:#80868b;">&mdash; Users</span></span></span>
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.6l1.65 3.35 3.7.55-2.67 2.6.63 3.68L8 11.05 4.69 12.78l.63-3.68-2.67-2.6 3.7-.55z"/></svg><span class="pfp"></span><span class="kebab"><i></i><i></i><i></i></span>
+      </div>
+    </div>
+    <div class="ui">
+      <div class="u-card">
+        <div class="u-h2">Users</div>
+        <div class="u-in ph" style="max-width:20rem;">Search by National ID, Digital ID, or Name&hellip;</div>
+        <div class="u-btns" style="align-items:flex-end; margin-bottom:.7rem;">
+          <div style="flex:1;"><span class="u-lab">National ID Card Number</span><div class="u-in ph" style="margin:0;">e.g. 1234-5678-9012-3456</div></div>
+          <div style="flex:1;"><span class="u-lab">Digital National ID (optional)</span><div class="u-in ph" style="margin:0;">e.g. ABC1234</div></div>
+          <div><span class="u-lab">Role</span><div class="u-in" style="margin:0;">Operator &#9662;</div></div>
+          <span class="u-btn sm">Add</span>
+        </div>
+        <table class="u-tab">
+          <thead><tr><th>Name</th><th>Identifiers</th><th>Role</th><th class="r"></th></tr></thead>
+          <tbody>
+            <tr>
+              <td>LISA ROSE REYES CRUZ</td>
+              <td><span class="u-hint">Card:</span> 0000-1111-2222-3333<br>
+                  <span class="u-hint">Digital:</span> SMP0001</td>
+              <td><span class="u-in" style="margin:0; padding:.15rem .4rem;">Operator &#9662;</span></td>
+              <td class="r"><span class="u-btn sm danger">Remove</span></td>
+            </tr>
+            <tr>
+              <td>JUAN PAULO DELA CRUZ</td>
+              <td><span class="u-hint">Card:</span> 0000-4444-5555-6666<br>
+                  <span class="u-badge no"><span class="pin" style="background:#dc3545; margin-right:.25rem;">1</span> Card number only</span></td>
+              <td><span class="u-in" style="margin:0; padding:.15rem .4rem;">Admin &#9662;</span></td>
+              <td class="r"><span class="u-btn sm danger">Remove</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <figcaption><b>The People list.</b> The role dropdown saves as soon as it is changed.</figcaption>
+  </figure>
+  <ol class="legend">
+    <li>This person cannot sign in with the Digital National ID on their card until somebody
+      adds it here. It is the first thing to check when a new member says sign-in refuses
+      them.</li>
+  </ol>
+
+  <div class="note cost">
+    <span class="lab">The "Card number only" flag</span>
+    <p>A member added by card number alone, who has never signed in, <strong>cannot sign in
+      with the Digital National ID printed on the same card</strong> &mdash; the site has not
+      yet been told the two belong together. The list flags them, and adding the digital ID
+      here fixes it. This is worth checking the first time a new member says sign-in does not
+      work.</p>
+  </div>
+
+  <p><kbd>Remove</kbd> asks for confirmation and then removes the person <strong>from this
+    organization</strong>. Their account is untouched: a person is site-wide and routinely
+    belongs to another organization. Their past transactions stay in your log, as they must.</p>
+</section>
+
+<section id="s37">
+  <h3><span class="n">3.7</span>Locations and transaction types</h3>
+  <p>Two lists, both yours, both edited the same way: type a name, press <kbd>Add</kbd>;
+    click a name to rename it; <kbd>Remove</kbd> to drop it. Both are searchable and paged.</p>
+  <ul class="plain">
+    <li><strong>Locations</strong> are the counters your operators sit at. They are what
+      <a href="#s13">/choose/</a> offers and what each transaction is logged against.</li>
+    <li><strong>Transaction types</strong> are what a verification was <em>for</em>. An
+      operator must pick one before <kbd>Log Transaction</kbd> will do anything, so this list
+      is worth keeping short and worth keeping in the words your staff actually use.</li>
+  </ul>
+  <p>These lists live on this page and nowhere else &mdash; deliberately, so there is only
+    ever one screen that owns each. A site administrator sees their counts but does not edit
+    them.</p>
+</section>
+
+<!-- ============================================================ 4 -->
+<div class="part-open" id="p4">
+  <div class="part-num">Part four &middot; <span class="chips" style="display:inline-flex"><span class="chip chip-site">Site administrator</span></span></div>
+  <h2>Running the installation</h2>
+</div>
+
+<section id="s41">
+  <h3><span class="n">4.1</span>The Site page</h3>
+  <div class="where"><span class="k">Where</span><span class="v">Site</span></div>
+
+  <p>Four counts across the top &mdash; organizations, how many are enabled, people, and
+    verifications &mdash; then one row per organization: its people, locations and transaction
+    type counts, whether its eVerify account is <em>Configured</em> or shows
+    <em>No credentials</em>, an <strong>Enabled</strong> switch, and <kbd>Manage</kbd>.</p>
+  <figure class="screen ui-wide">
+    <div class="chrome">
+      <div class="tabs">
+        <span class="tab"><span class="fav">V</span><span class="tt">Verify: Site Administration</span><span class="x">&#10005;</span></span>
+        <span class="newtab">+</span>
+        <span class="wc"><i class="min"></i><i class="max"></i><i class="cls"></i></span>
+      </div>
+      <div class="bar">
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg><svg class="ic dim" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg><svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13.2 2.2v3h-3"/></svg>
+        <span class="omni"><svg class="ic" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.6" y="7" width="8.8" height="6.4" rx="1.3"/><path d="M5.6 7V5.4a2.4 2.4 0 0 1 4.8 0V7"/></svg><span class="u"><b>verify.example.org</b><span>/app/site/</span></span></span>
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.6l1.65 3.35 3.7.55-2.67 2.6.63 3.68L8 11.05 4.69 12.78l.63-3.68-2.67-2.6 3.7-.55z"/></svg><span class="pfp"></span><span class="kebab"><i></i><i></i><i></i></span>
+      </div>
+    </div>
+    <div class="ui">
+      <div class="u-tiles">
+        <div class="u-tile"><b>4</b><span>Organizations</span></div>
+        <div class="u-tile"><b>3</b><span>Enabled</span></div>
+        <div class="u-tile"><b>41</b><span>People</span></div>
+        <div class="u-tile"><b>2,860</b><span>Verifications</span></div>
+      </div>
+      <div class="u-card">
+        <div class="u-h2">Organizations <span style="margin-left:auto;"><span class="u-btn sm">Create organization</span></span></div>
+        <table class="u-tab">
+          <thead><tr><th>Organization</th><th>People</th><th>Locations</th><th>Types</th><th>eVerify</th><th>Enabled</th><th class="r"></th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span style="display:inline-flex; align-items:center; gap:.35rem;"><span class="u-mark" style="width:20px; height:20px; font-size:.62em;">PSA</span> Philippine Statistics Authority</span></td>
+              <td>17</td><td>6</td><td>9</td>
+              <td><span class="u-badge ok">Configured</span></td>
+              <td><span class="u-sw on"></span></td>
+              <td class="r"><span class="u-btn sm sec">Manage</span>
+                <span class="u-hint" style="text-decoration:line-through;" title="refused">Delete</span>
+                <span class="pin">1</span></td>
+            </tr>
+            <tr>
+              <td><span style="display:inline-flex; align-items:center; gap:.35rem;"><span class="u-mark" style="width:20px; height:20px; font-size:.62em; background:#7a5d3a;">CB</span> City of Bacoor</span></td>
+              <td>12</td><td>3</td><td>5</td>
+              <td><span class="u-badge no">No credentials</span> <span class="pin">2</span></td>
+              <td><span class="u-sw on"></span></td>
+              <td class="r"><span class="u-btn sm sec">Manage</span> <span class="u-btn sm danger">Delete</span></td>
+            </tr>
+            <tr style="opacity:.6;">
+              <td><span style="display:inline-flex; align-items:center; gap:.35rem;"><span class="u-mark" style="width:20px; height:20px; font-size:.62em; background:#5b6770;">PT</span> Pilot &mdash; Taguig</span></td>
+              <td>2</td><td>1</td><td>1</td>
+              <td><span class="u-badge ok">Configured</span></td>
+              <td><span class="u-sw"></span> <span class="pin">3</span></td>
+              <td class="r"><span class="u-btn sm sec">Manage</span> <span class="u-btn sm danger">Delete</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <figcaption><b>The Site page.</b> One row per organization, with its counts and its two
+      switches.</figcaption>
+  </figure>
+  <ol class="legend">
+    <li>Delete is <em>not offered</em> here: this organization has verified people, and
+      deleting it would leave those transactions and credentials belonging to nobody. The
+      row says so instead of showing a button the server would refuse.</li>
+    <li>This organization cannot verify anybody until its own eVerify account is filled in.
+      Its operators see a red banner on the Verify page saying so by name.</li>
+    <li>Disabled. It keeps everything, stops appearing at sign-in, and any session inside it
+      ends on the next request.</li>
+  </ol>
+
+  <p>The Enabled switch takes effect at once. A disabled organization stops appearing at
+    sign-in, and any session already inside it ends on the next request rather than at the
+    next login.</p>
+</section>
+
+<section id="s42">
+  <h3><span class="n">4.2</span>Create an organization</h3>
+  <p><kbd>Create organization</kbd> opens a form. <strong>Nothing exists until you submit
+    it</strong> &mdash; you can open the page, look at it, and leave without creating
+    anything. Give it a name at minimum; an <strong>issuer code</strong> is assigned when it
+    is created, and it is what identifies the organization inside a credential it mints.</p>
+  <p>The sections that need a saved organization &mdash; its people, its eVerify field list,
+    the copy-credentials control &mdash; appear only after the first save. If the form is
+    refused it hands your typing back rather than emptying itself.</p>
+</section>
+
+<section id="s43">
+  <h3><span class="n">4.3</span>Manage an organization</h3>
+  <p>One form, grouped, with the <strong>Enabled</strong> switch as a status row at its head
+    beside the name, the mark and the eVerify badge.</p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Section</th><th>Holds</th></tr></thead>
+      <tbody>
+        <tr><td><b>Identity</b></td><td>Logo, organization name, banner subtitle, issuer code, mark colour.</td></tr>
+        <tr><td><b>Address</b></td><td>Two address lines, barangay, city or municipality, postal code, country. <strong>Every one optional.</strong></td></tr>
+        <tr><td><b>Contact</b></td><td>Contact person, email, mobile number. Also optional; the email is checked for shape if you fill it in.</td></tr>
+        <tr><td><b>eVerify credentials</b></td><td>The organization's own verifying account, as in <a href="#s35">3.5</a> &mdash; plus <kbd>Copy</kbd>, which lifts another organization's credentials into this one when several share an eVerify account.</td></tr>
+        <tr><td><b>People</b></td><td>Assign somebody by National ID with a role, or remove them. The same list an organization administrator edits.</td></tr>
+        <tr><td><b>Lists and history</b></td><td>Counts of locations, transaction types and transactions. Read-only here &mdash; those lists belong to the organization's own admins.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The address and contact are a record, not an input to anything. Nothing prints them on a
+    document and no credential carries them. They are optional because a deployment already
+    has organizations, and a required postal code would stop somebody saving an unrelated
+    change until they went and found one.</p>
+  <p>The contact person's name, email and number are masked in Demo Mode; the address is not.
+    Demo Mode hides people, not places &mdash; an organization's address is on every
+    letterhead it prints.</p>
+</section>
+
+<section id="s44">
+  <h3><span class="n">4.4</span>Which eVerify fields an organization keeps</h3>
+  <div class="where"><span class="k">Where</span><span class="v">Site &rarr; Manage &rarr; eVerify fields</span></div>
+
+  <p>Every field a Tier II lookup returns, in one list, with two switches each.</p>
+  <ul class="plain">
+    <li><strong>Display</strong> puts the field on the verification document &mdash; and
+      therefore in the offline credential and on the holder's card, which carry what the
+      document shows.</li>
+    <li><strong>Log</strong> records it in the transaction log, and so in the export.</li>
+    <li>A field with <strong>both off</strong> is never asked for at all.</li>
+  </ul>
+
+  <figure class="screen">
+    <div class="chrome">
+      <div class="tabs">
+        <span class="tab"><span class="fav">V</span><span class="tt">Verify: Philippine Statistics Authority</span><span class="x">&#10005;</span></span>
+        <span class="newtab">+</span>
+        <span class="wc"><i class="min"></i><i class="max"></i><i class="cls"></i></span>
+      </div>
+      <div class="bar">
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg><svg class="ic dim" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg><svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13.2 2.2v3h-3"/></svg>
+        <span class="omni"><svg class="ic" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.6" y="7" width="8.8" height="6.4" rx="1.3"/><path d="M5.6 7V5.4a2.4 2.4 0 0 1 4.8 0V7"/></svg><span class="u"><b>verify.example.org</b><span>/app/site/organizations/1/</span> <span style="color:#80868b;">&mdash; eVerify fields</span></span></span>
+        <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.6l1.65 3.35 3.7.55-2.67 2.6.63 3.68L8 11.05 4.69 12.78l.63-3.68-2.67-2.6 3.7-.55z"/></svg><span class="pfp"></span><span class="kebab"><i></i><i></i><i></i></span>
+      </div>
+    </div>
+    <div class="ui">
+      <div class="u-card">
+        <div class="u-h2">eVerify fields</div>
+        <div style="display:grid; grid-template-columns: 1fr 148px; gap:.7rem; align-items:start;">
+          <div>
+            <div style="display:flex; align-items:center; gap:.4rem; border:1px solid #e0e0e0; border-radius:4px; padding:.3rem .4rem; margin-bottom:.3rem; background:#fff;">
+              <span class="u-hint" title="Drag to reorder">&#8759;</span>
+              <span class="u-hint">&#9650;&#9660;</span>
+              <span class="u-in" style="margin:0; padding:.15rem .35rem; flex:1;">Given Name</span>
+              <span class="u-hint" style="font-family:'IBM Plex Mono',monospace; font-size:.82em;">first_name</span>
+              <span style="display:flex; gap:.45rem; align-items:center;">
+                <span><span class="u-sw on" style="width:24px; height:14px;"></span> <span style="font-size:.8em;">Display</span></span>
+                <span><span class="u-sw on" style="width:24px; height:14px;"></span> <span style="font-size:.8em;">Log</span></span>
+              </span>
+            </div>
+            <div style="display:flex; align-items:center; gap:.4rem; border:1px solid #e0e0e0; border-radius:4px; padding:.3rem .4rem; margin-bottom:.3rem; background:#fff;">
+              <span class="u-hint">&#8759;</span><span class="u-hint">&#9650;&#9660;</span>
+              <span class="u-in" style="margin:0; padding:.15rem .35rem; flex:1;">Photo</span>
+              <span class="u-hint" style="font-family:'IBM Plex Mono',monospace; font-size:.82em;">face_url</span>
+              <span style="display:flex; gap:.45rem; align-items:center;">
+                <span><span class="u-sw on" style="width:24px; height:14px;"></span> <span style="font-size:.8em;">Display</span></span>
+                <span><span class="u-hint">&mdash;</span> <span style="font-size:.8em;">Log</span> <span class="pin">1</span></span>
+              </span>
+            </div>
+            <div style="text-align:center; font-size:.8em; color:#666; margin:.45rem 0 .3rem; border-top:1px dashed #cfd7e0; padding-top:.35rem;">
+              Also returned, not previously used (23)</div>
+            <div style="display:flex; align-items:center; gap:.4rem; border:1px solid #e0e0e0; border-radius:4px; padding:.3rem .4rem; background:#f7f8fa; opacity:.75;">
+              <span class="u-hint">&#8759;</span><span class="u-hint">&#9650;&#9660;</span>
+              <span class="u-in ph" style="margin:0; padding:.15rem .35rem; flex:1;">present_barangay <span class="pin">2</span></span>
+              <span class="u-hint" style="font-family:'IBM Plex Mono',monospace; font-size:.82em;">present_barangay</span>
+              <span style="display:flex; gap:.45rem; align-items:center;">
+                <span><span class="u-sw" style="width:24px; height:14px;"></span> <span style="font-size:.8em;">Display</span></span>
+                <span><span class="u-sw" style="width:24px; height:14px;"></span> <span style="font-size:.8em;">Log</span></span>
+              </span>
+            </div>
+          </div>
+          <div>
+            <div style="border:1px solid #e0e0e0; border-radius:4px; padding:.35rem; background:#fff; margin-bottom:.4rem;">
+              <div style="font-size:.8em; font-weight:600; color:#00386a; margin-bottom:.25rem;">Verification document</div>
+              <div style="font-size:.75em; color:#555; line-height:1.5;">Given Name<br>Middle Name<br>Last Name<br>Photo<br><span class="u-hint">&hellip;</span></div>
+            </div>
+            <div style="border:1px solid #e0e0e0; border-radius:4px; padding:.35rem; background:#fff;">
+              <div style="font-size:.8em; font-weight:600; color:#00386a; margin-bottom:.25rem;">Transaction log &middot; header row</div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:.68em; color:#555; word-break:break-all;">GIVEN_NAME,MIDDLE_NAME,LAST_NAME,&hellip;</div>
+            </div>
+          </div>
+        </div>
+        <div class="u-btns" style="margin-top:.6rem;">
+          <span class="u-btn sm">Save fields</span>
+          <span class="u-btn sm sec">Reset to defaults</span>
+          <span class="u-hint">The list itself is fixed &mdash; adding a key is a code change.</span>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>The field editor</b>, with the document and the CSV header previewed
+      beside it. Both previews follow the same single order.</figcaption>
+  </figure>
+  <ol class="legend">
+    <li>The photograph has no <em>Log</em> switch at all &mdash; not one that is off. An
+      image is never written to a log column.</li>
+    <li>A field below the divider shows its raw eVerify key until you give it a name. Switch
+      it on without naming it and the document prints <code>present_barangay</code>.</li>
+  </ol>
+
+  <p>One order governs both: the document prints its rows in it and the export takes its
+    columns from it, skipping what is not logged. Drag a row, or use the arrows. The
+    <strong>name</strong> you give a field is what the document prints and what the CSV column
+    is called; the first thirteen came with names, the rest show their raw eVerify key until
+    you give them one. A preview of the document rows and the CSV header row sits beside the
+    list and updates as you work. <kbd>Save fields</kbd> applies it;
+    <kbd>Reset to defaults</kbd> puts the whole list back.</p>
+
+  <div class="note no">
+    <span class="lab">"Log" off means never recorded</span>
+    <p>Not merely unexported. The value is not kept at all, so it <strong>cannot be exported
+      later by switching the toggle back on</strong>. History already recorded is untouched,
+      but the gap while a field was off stays a gap &mdash; including on the Validate page and
+      in the organization's transaction list.</p>
+  </div>
+
+  <div class="note">
+    <span class="lab">Why this is yours and not the organization's</span>
+    <p>An organization's counters and transaction types are its daily business. What is
+      printed on a document that leaves the building, and what is kept in a log afterwards,
+      is a decision about the deployment. One screen owns each.</p>
+  </div>
+
+  <p>The face photo has no <strong>Log</strong> switch at all &mdash; it is an image, and it
+    is never written to a log column. The list itself is fixed: adding a key is a change to
+    the software, not a setting.</p>
+</section>
+
+<section id="s45">
+  <h3><span class="n">4.5</span>Disable, or delete</h3>
+  <p>These are two different answers and they are not interchangeable.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th></th><th>Disable</th><th>Delete</th></tr></thead>
+      <tbody>
+        <tr><td><b>For</b></td><td>An organization that has done work and should stop.</td><td>A row that should not exist at all.</td></tr>
+        <tr><td><b>Reversible</b></td><td>Yes &mdash; flip the switch back.</td><td>No.</td></tr>
+        <tr><td><b>Keeps</b></td><td>Everything: people, locations, transactions.</td><td>Nobody's account. A person is site-wide.</td></tr>
+        <tr><td><b>Takes</b></td><td>Nothing.</td><td>The organization's own lists: memberships, locations, transaction types, field settings, paired readers.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note no">
+    <span class="lab">Delete is refused once anything has been verified</span>
+    <p>The row shows the reason in place of the button rather than offering an action that
+      would only be refused. Deleting an organization with history would not destroy that
+      history &mdash; it would do something quieter and worse: leave transactions and issued
+      credentials belonging to no organization, invisible to every screen and to every export,
+      while the log still asserts somebody was verified. <strong>Disable it instead.</strong></p>
+  </div>
+</section>
+
+<section id="s46">
+  <h3><span class="n">4.6</span>How the site signs in</h3>
+  <div class="where"><span class="k">Where</span><span class="v">Setup &rarr; Site Administration</span></div>
+
+  <p>This section appears on the Setup page for site administrators only, and it applies to
+    every organization on the installation.</p>
+
+  <h4>Credential validity</h4>
+  <p>How long a new document's cut-out card and a holder's credential stay valid, in days: 30
+    unless you change it, and up to 365. The date prints on the card and is signed into its
+    code, so changing this never moves the date on a card already issued. A phone that syncs
+    can read a card until it expires. A longer validity therefore puts more keys on every
+    phone for longer, and a lost phone can open more old cards.</p>
+
+  <h4>Login method</h4>
+  <p>Two, and exactly one is live at a time:</p>
+  <ul class="plain">
+    <li><strong>eVerify</strong> &mdash; the default. The login page runs the National ID
+      lookup and the face check itself, using the sign-in account below.</li>
+    <li><strong>Single sign-on</strong> &mdash; an OpenID Connect provider the site administrator names runs the
+      lookup and the face check on its side and returns the identifiers. Requires an
+      <strong>SSO Issuer</strong>, <strong>Client ID</strong> and <strong>Client
+      Secret</strong>; selecting the method with any of those missing is refused at save
+      time, so the site cannot be left with a login route that has no provider behind it.</li>
+  </ul>
+  <p>Registering this site with the provider is a separate step done by whoever runs the
+    provider. The redirect address is exact-match and is
+    <code>https://&lt;host&gt;/national-id/callback/</code>.</p>
+
+  <h4>Sign-in eVerify client</h4>
+  <p>The account used to <strong>sign operators in</strong>. It is site-wide because the login
+    page runs before anybody has a session, so the site does not yet know which organization
+    the person belongs to and cannot know whose account to use. It is a
+    <strong>different</strong> account from the ones organizations verify with
+    (<a href="#s35">3.5</a>), and merging them is not possible.</p>
+
+  <div class="note no">
+    <span class="lab">Check this before deploying anything</span>
+    <p>If the sign-in account is wrong or empty, <strong>nobody can sign in</strong> &mdash;
+      including you. Change it during a quiet hour, and confirm with a real sign-in
+      afterwards rather than by reading the form back.</p>
+  </div>
+</section>
+
+<section id="s47">
+  <h3><span class="n">4.7</span>Who may read holder details on a phone</h3>
+  <div class="where"><span class="k">Where</span><span class="v">Django admin &rarr; Users</span></div>
+
+  <p>A paired phone either confirms a document is genuine, or additionally reads the holder's
+    details out of it. That is set <strong>on the person, not the handset</strong>: a
+    self-service page where somebody granted their own phone access would not be a control at
+    all, and holding it on the person means withdrawing it reaches every phone they own at
+    that phone's next sync.</p>
+  <p>It is <strong>on by default</strong> for an organization's members, because a verifier
+    that cannot show the name it has just validated cannot be compared against the person
+    holding the card &mdash; and somebody trusted to run the verification on the web is
+    already reading the same fields there. Withdraw it on the user when somebody should not
+    have it.</p>
+  <p>Device records themselves are read-only in the admin. A row describes a phone that
+    presented a real key; editing one by hand could only make it describe a phone that does
+    not exist.</p>
+</section>
+
+<section id="s48">
+  <h3><span class="n">4.8</span>Issued credentials and revocation</h3>
+  <div class="where"><span class="k">Where</span><span class="v">Django admin &rarr; Issued credentials</span></div>
+
+  <p>Every offline credential this installation mints is recorded. The list is read-only and
+    cannot be added to by hand &mdash; it is the authoritative record of what exists in the
+    world, and a credential that exists but is not listed here could never be withdrawn.</p>
+  <p>Revoking one is done from this list. Paired phones pick the withdrawal up at their next
+    sync, so a phone that has not synced recently may still accept a revoked document
+    &mdash; which is the reason <kbd>Sync</kbd> exists on the Devices page and the reason a
+    fleet should sync on a schedule.</p>
+
+  <div class="note no">
+    <span class="lab">There is no un-revoke</span>
+    <p>A credential withdrawn and then quietly restored is worse than one never withdrawn: the
+      phone that cached the revocation and the phone that did not would disagree about the
+      same document. If a document was revoked in error, verify the person again and issue a
+      new one.</p>
+  </div>
+</section>
+
+<section id="s49">
+  <h3><span class="n">4.9</span>Refused sign-in attempts</h3>
+  <div class="where"><span class="k">Where</span><span class="v">Django admin &rarr; Login attempts</span></div>
+
+  <p>When somebody attempts to sign in with a National ID this site does not know, the attempt
+    is recorded &mdash; the number used, the time, and the frame the face check handed back.
+    Successful sign-ins are not recorded here, and a refused attempt is <strong>not</strong> a
+    transaction: a stranger at the login page has no organization and must not appear in one.</p>
+
+  <div class="note cost">
+    <span class="lab">Treat this table as sensitive, and age it out</span>
+    <p>It holds photographs of people, some of whom are simply your own staff who mistyped a
+      digit. Nothing empties it automatically &mdash; how long the log is worth keeping is a
+      policy decision for whoever runs the deployment, not a default this software should
+      pick. The maintenance command <code>purge_login_attempts --days 90</code> clears it, and
+      <code>--photos-only</code> keeps who-tried-with-what while dropping the faces.</p>
+  </div>
+  <p>It is the first place to look when an operator reports that sign-in refuses them: the
+    number they actually typed is in the row, which usually settles it in one glance.</p>
+</section>
+
+<!-- ============================================================ 5 -->
+<div class="part-open" id="p5">
+  <div class="part-num">Part five</div>
+  <h2>Reference</h2>
+</div>
+
+<section id="s51">
+  <h3><span class="n">5.1</span>What Demo Mode hides</h3>
+  <p>Three conventions, applied everywhere, so what you see redacted on one page is redacted
+    the same way on the next. Redaction runs are jittered in length, so a bullet run does not
+    give away what it hides.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Convention</th><th>Keeps</th><th>Applied to</th></tr></thead>
+      <tbody>
+        <tr><td><b>Name</b></td><td>The first word</td><td>A person's name, and your own name in the corner. Names are masked as one string &mdash; masking given, middle and last separately would keep all three whole.</td></tr>
+        <tr><td><b>Identifier</b></td><td>The last character</td><td>National ID numbers, client IDs, reader serial numbers, contact numbers, the host in an SSO redirect address.</td></tr>
+        <tr><td><b>Address</b></td><td>Only the scheme</td><td>eVerify base URLs, the SSO issuer, the fingerprint reader endpoint.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>On a verification: the photo is blurred by being resampled down and back &mdash; the
+    detail is thrown away, not merely smeared &mdash; the given name, full name and addresses
+    show their first word only, the ID numbers show their last digit, and only the surname is
+    shown whole. Every other field is redacted: the middle name, dates and place of birth, sex,
+    blood type and marital status, and any field a site administrator switches on later. The
+    offline credential printed beside the bullets carries the redacted values too, so the
+    audience cannot read with a phone what the projector is hiding.</p>
+  <p>Not covered, deliberately: <strong>the transaction log and the CSV export.</strong></p>
+</section>
+
+<section id="s52">
+  <h3><span class="n">5.2</span>The printed sheet</h3>
+  <p>Every figure here is measured on rendered pages, not estimated, and the layout is
+    designed so the sheet stays a single A4 page at every field count an organization can
+    configure.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Element</th><th>Carries</th><th class="num">Printed at</th><th>Read by</th></tr></thead>
+      <tbody>
+        <tr><td>QR beside the seal</td><td>The transaction number, nothing else</td><td class="num">20 mm</td><td>Any webcam, across a desk &mdash; the online check</td></tr>
+        <tr><td>Card &mdash; credential square</td><td>The signed offline credential (CL03)</td><td class="num">48.8 mm</td><td>A paired phone, with no network</td></tr>
+        <tr><td>Card &mdash; portrait square</td><td>The holder's face</td><td class="num">48.8 mm</td><td>A paired phone; it holds no record to look up</td></tr>
+        <tr><td>PSA authentication seal</td><td>&mdash;</td><td class="num">23.5 mm</td><td>A person</td></tr>
+        <tr><td>The cut-out card</td><td>Both squares and the identity band</td><td class="num">68 &times; 170 mm</td><td>Printed on its side; cut along the marks</td></tr>
+        <tr><td>The holder's portrait, on the sheet</td><td>&mdash;</td><td class="num">16 mm at its smallest</td><td>A person, against the face at the counter</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>The squares are sized so no printed module falls below 0.4 mm, which is where a laser
+    print photographed under ordinary lighting stops scanning reliably. The card reads
+    sideways until it is cut out, which is exactly what lets it fit on the sheet. A phone
+    scanning it can be held at any angle.</p>
+
+  <h4>How one page is guaranteed</h4>
+  <p>The space the card needs below the cut line is <strong>reserved</strong>, not merely
+    preferred &mdash; nothing above it can push it onto a second sheet. The block above is then
+    laid out, <em>measured</em>, and reduced only as far as it needs to be, with a floor under
+    every element that gives way: type never goes below 5.5 pt and the portrait never below
+    16 mm. If a sheet still will not fit at those floors, it changes <b>layout</b> rather than
+    shrinking further.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Fields displayed</th><th>Form</th><th class="num">Prints at</th><th>Portrait</th></tr></thead>
+      <tbody>
+        <tr><td>13 &mdash; the default list</td><td>Centred</td><td class="num">Full size</td><td>30 mm</td></tr>
+        <tr><td>16</td><td>Centred</td><td class="num">Full size</td><td>30 mm</td></tr>
+        <tr><td>22</td><td>Centred</td><td class="num">78&ndash;88%</td><td>23&ndash;26 mm</td></tr>
+        <tr><td>36 &mdash; every field there is</td><td>Two columns</td><td class="num">92&ndash;94%</td><td>~28 mm</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Measured across sixteen documents &mdash; four field counts against four holder-name
+    lengths &mdash; on both the <kbd>Print Document</kbd> and the <kbd>Save as PDF</kbd> paths.
+    Every one is a single A4 page with its ink inside the margin on all four edges. A very long
+    name costs a little of the budget on top of the field count: at 16 fields a 132-character
+    holder brings the sheet to 90%, where an ordinary name leaves it at full size.</p>
+  <div class="note">
+    <span class="lab">Why the busiest sheet is not the smallest print</span>
+    <p>A 36-field document prints <em>larger</em> than a 22-field one. Running the list in two
+      columns halves the number of rows, which gives back far more room than shrinking the type
+      ever did &mdash; so the sheet that had to give up the most is the one that gained the
+      most when the layout changed rather than the size.</p>
+  </div>
+  <div class="note cost">
+    <span class="lab">If a symbol will not scan</span>
+    <p>The constraint is almost always the camera, not the printer &mdash; draft quality on
+      plain paper decodes about as reliably as photo quality on coated stock. What matters is
+      how many pixels the camera puts on each module: fill the frame with the one square you
+      are scanning rather than photographing the whole page.</p>
+  </div>
+</section>
+
+<section id="s53">
+  <h3><span class="n">5.3</span>Messages, and what to do</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th>You see</th><th>It means</th><th>Do</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>"An ID for the provided details could not be found" at sign-in</td>
+          <td>No operator is registered here under that number.</td>
+          <td>Check the number. If they were added by card number only, an admin adds their Digital National ID (<a href="#s36">3.6</a>).</td>
+        </tr>
+        <tr>
+          <td>"&hellip; has no eVerify credentials yet"</td>
+          <td>This organization's verifying account is not filled in.</td>
+          <td>An organization admin adds it (<a href="#s35">3.5</a>). No operator workaround exists.</td>
+        </tr>
+        <tr>
+          <td>Outcome screen, <b>Not completed</b></td>
+          <td>The lookup never happened. Nothing was looked up about this person.</td>
+          <td>Try again with the same details. If it repeats, escalate &mdash; it is usually the site's credentials or the service itself.</td>
+        </tr>
+        <tr>
+          <td>Validate camera finds nothing for thirty seconds</td>
+          <td>Usually the wrong square, or too little of the frame filled.</td>
+          <td>Scan the small QR in the document footer, or the credential square on the card, close in.</td>
+        </tr>
+        <tr>
+          <td>"That code is not valid" when pairing</td>
+          <td>The code was already used, has expired, or is for a different operation.</td>
+          <td>Generate a fresh one from the Devices page.</td>
+        </tr>
+        <tr>
+          <td>A phone reads <span class="pill warn">Keys stale</span></td>
+          <td>Its keys ran out or were replaced.</td>
+          <td><kbd>Sync</kbd> and scan. <strong>Do not revoke it.</strong></td>
+        </tr>
+        <tr>
+          <td>The document printed with no cut-out card</td>
+          <td>No offline credential was minted for it.</td>
+          <td>Nothing at the counter. The document is still valid and its footer QR still validates.</td>
+        </tr>
+        <tr>
+          <td>The card link on the holder's phone has expired</td>
+          <td>More than a few minutes passed, or you left the document page.</td>
+          <td>Give them the printed cut-out card instead.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="s54">
+  <h3><span class="n">5.4</span>Glossary</h3>
+  <div class="tw">
+    <table>
+      <tbody>
+        <tr><td><b>eVerify</b></td><td>The PSA service this site checks people against. Two separate accounts are used: one site-wide for signing operators in, one per organization for verifying the public.</td></tr>
+        <tr><td><b>Liveness / face check</b></td><td>The camera step run by eVerify's own software, which confirms a live person is present. This site never opens the camera itself.</td></tr>
+        <tr><td><b>Transaction</b></td><td>One logged verification: who was checked, by whom, where, when, for what, and whether it succeeded.</td></tr>
+        <tr><td><b>Transaction type</b></td><td>What a verification was for. Each organization keeps its own list.</td></tr>
+        <tr><td><b>Credential</b></td><td>The signed, encrypted record printed in the card's larger square, as a CL03 code. A paired phone opens it with no network. Once issued it cannot be edited &mdash; only revoked.</td></tr>
+        <tr><td><b>CL03</b></td><td>The credential square's format, and the way a paired phone validates it offline. Its text is the transaction number, then <code>CL03:</code> and the signed record. The offline verification system that reads it is the <b>CL03 implementation</b>.</td></tr>
+        <tr><td><b>Card</b></td><td>The two-square object below the document's cut line, and the same object saved to a holder's phone.</td></tr>
+        <tr><td><b>Wallet pass</b></td><td>The same verification added to a holder's Apple Wallet on an iPhone, as one pass: the credential square, with the holder's photo. The verifier app checks the face from the portrait square on the card or the document, not from the pass.</td></tr>
+        <tr><td><b>Issuer code</b></td><td>A short code assigned to an organization when it is created, identifying it inside the credentials it mints.</td></tr>
+        <tr><td><b>Membership</b></td><td>One person's role &mdash; Operator or Admin &mdash; inside one organization. The same person can hold different roles at different organizations.</td></tr>
+        <tr><td><b>Site administrator</b></td><td>A site-wide capability, held independently of any membership.</td></tr>
+        <tr><td><b>Demo Mode</b></td><td>A per-person switch that redacts what is on screen so a real ID can be shown to an audience. It never changes what is recorded.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="colophon">
+  <p class="part-num">Colophon</p>
+  <h2>Verify Operator's Manual</h2>
+
+  <div class="cols2">
+    <div>
+      <h4>Questions</h4>
+      <address>
+        Ask your site's administrator. This manual describes the software;
+        whoever runs your site decides its organizations, members and
+        settings.
+      </address>
+    </div>
+    <div>
+      <h4>About this edition</h4>
+      <address>
+        <b>Version 1.5 &middot; build 00052</b><br>
+        11 September 2026<br><br>
+        Stamped from the repository <code>VERSION</code> file, the same source
+        the software itself reports.
+      </address>
+    </div>
+  </div>
+
+  <p class="fine">For how to build and run a site of your own, see
+    <code>docs/deploy-aws.md</code>; for how the system is put together, the
+    architecture deck in the same folder.
+    This manual is generated from <code>docs/user-manual.html</code> by
+    <code>docs/build_user_manual_pdf.py</code>; edit the page, not the PDF.</p>
+
+</section>
+
+</main>
+</div>
+</div>
+</body>
+</html>

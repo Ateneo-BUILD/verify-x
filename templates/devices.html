@@ -1,0 +1,497 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Devices{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<style>
+    /* The list on the left of a wide window, the issued code and the
+       pairing form beside it. The list spans both rows and row 2 is the
+       flexible one, so its extra height goes there and the form sits
+       directly under the code -- or at the top, when there is no code. */
+    @media screen and (min-width: 1100px) {
+        .device-cols {
+            display: grid;
+            grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+            grid-template-rows: auto 1fr;
+            column-gap: 1.25rem;
+            align-items: start;
+        }
+        .device-cols > .device-list { grid-column: 1; grid-row: 1 / span 2; min-width: 0; }
+        .device-cols > .pair-panel { grid-column: 2; grid-row: 1; min-width: 0; }
+        .device-cols > .pair-card { grid-column: 2; grid-row: 2; min-width: 0; }
+    }
+    .pair-row { display: flex; gap: 1.25rem; align-items: flex-start; flex-wrap: wrap; }
+    .qr-plate {
+        background: #fff; border: 1px solid var(--border-color);
+        border-radius: 6px; padding: 0.6rem; line-height: 0; flex: 0 0 auto;
+    }
+    /* Pinned black on white whatever else the page does. A scanner needs dark
+       modules on a light ground, and a QR that inverted itself would simply
+       stop working. */
+    .qr-plate canvas { display: block; width: 190px; height: 190px; background: #fff; }
+    /* Stands in for the symbol when the address is one the app refuses, so the
+       layout holds and the gap reads as deliberate rather than as a failure to
+       draw. */
+    .qr-plate-empty {
+        width: 190px; height: 190px; display: flex; align-items: center;
+        justify-content: center; text-align: center; line-height: 1.4;
+        border-style: dashed;
+    }
+    .pair-detail { flex: 1; min-width: 16rem; }
+    .pair-detail p { margin: 0 0 0.6rem; font-size: 0.85rem; }
+    .codebox {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 1.25rem; letter-spacing: 0.18em; font-weight: 700;
+        color: var(--secondary-color); background: #f2f5f8;
+        border: 1px solid var(--border-color); border-radius: 4px;
+        padding: 0.4rem 0.7rem; display: inline-block;
+    }
+    .countdown { font-size: 0.78rem; color: #9a5b2c; font-weight: 600; }
+
+    table.devices { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    table.devices thead th {
+        text-align: left; font-size: 0.62rem; letter-spacing: 0.08em;
+        text-transform: uppercase; color: #8b98a5; font-weight: 700;
+        padding: 0 0.5rem 0.4rem; border-bottom: 1.5px solid var(--border-color);
+    }
+    table.devices td {
+        padding: 0.55rem 0.5rem; border-bottom: 1px solid #eef1f4;
+        vertical-align: middle;
+    }
+    table.devices tr.revoked td { color: #9aa4ae; }
+    .who { font-weight: 600; }
+    /* A <details>, not a button and a script. A rename control that needs JS
+       to appear is one that silently does nothing when the script fails.
+       This one is the browser's own disclosure: it opens with no
+       code at all, so there is nothing here to break. */
+    .rename { margin-top: 0.3rem; }
+    .rename summary {
+        cursor: pointer; width: max-content; font-size: 0.68rem;
+        font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+        color: var(--secondary-color);
+    }
+    .rename summary:hover { text-decoration: underline; }
+    .rename form {
+        display: flex; gap: 0.35rem; align-items: center; margin: 0.4rem 0 0;
+    }
+    .rename input[type="text"] {
+        font-size: 0.78rem; padding: 0.26rem 0.45rem; width: 12rem;
+        border: 1px solid var(--border-color); border-radius: 4px;
+        box-sizing: border-box;
+    }
+    .rename input[type="text"]:focus {
+        outline: none; border-color: var(--primary-color);
+        box-shadow: 0 0 0 2px rgba(0, 82, 155, 0.15);
+    }
+    .devid {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.68rem; color: #8b98a5;
+    }
+    .pill {
+        display: inline-block; font-size: 0.66rem; font-weight: 700;
+        padding: 0.1rem 0.45rem; border-radius: 10px; white-space: nowrap;
+    }
+    .pill.ok { background: #e6f4ea; color: #1d7a4c; }
+    .pill.warn { background: #fdf0e3; color: #9a5b2c; }
+    .pill.off { background: #eceff2; color: #66717c; }
+    .attest { font-size: 0.68rem; color: #66717c; }
+    .attest.failed { color: #b02a37; font-weight: 600; }
+    .pill.tier { background: #e7eef5; color: var(--secondary-color); }
+    .row-actions { display: flex; gap: 0.35rem; justify-content: flex-end; }
+    .row-actions form { display: inline; margin: 0; }
+    .container button.btn-revoke, .container button.btn-op {
+        width: auto; margin-top: 0; padding: 0.25rem 0.6rem; font-size: 0.75rem;
+        /* An open rename widens the Device column, and without this the
+           squeeze lands on these labels -- Re-key breaks across two lines
+           mid-word. The name is what should give way, not the verb. */
+        white-space: nowrap;
+    }
+    .container button.btn-revoke { background-color: #dc3545; }
+    .container button.btn-revoke:hover { background-color: #b02a37; }
+    .container button.btn-op { background-color: #6b7a89; }
+    .container button.btn-op:hover { background-color: #55626e; }
+    .container button.btn-pair { width: auto; margin-top: 0; padding: 0.5rem 1rem; font-size: 0.85rem; }
+    /* Works for: which organizations a phone offers in its chooser and names
+       in its log. Pills for what it works for now, and the same <details>
+       disclosure as Rename for changing it -- no script to fail. */
+    .pill.org { background: #eef1f4; color: #33404d; margin: 0 0.15rem 0.15rem 0; }
+    .orgs form { flex-direction: column; align-items: flex-start; }
+    .org-boxes { display: flex; flex-direction: column; gap: 0.2rem; }
+    .container .org-boxes label {
+        display: flex; align-items: center; gap: 0.4rem; margin: 0;
+        font-weight: 400; font-size: 0.8rem;
+    }
+    .container .org-boxes input[type="checkbox"] {
+        width: auto; margin: 0; padding: 0;
+    }
+    .empty { text-align: center; color: #999; padding: 1.25rem; font-size: 0.85rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    {% include "includes/app_nav.html" %}
+
+    <h1 class="page-title">Devices</h1>
+    <p class="page-subtitle">
+        Phones paired to your account, and what they may read.
+    </p>
+
+    {% comment %}
+    The device list on the left of a wide window; the code just issued and
+    the form that pairs another phone beside it. Kept in the order a narrow
+    window has always shown them -- the code, the list, the form -- and
+    placed by .device-cols.
+    {% endcomment %}
+    <div class="device-cols">
+    {% if pairing %}
+    <div class="card pair-panel">
+        <h2>{{ pairing.heading }}</h2>
+        <div class="pair-row">
+            {% if pairing.will_load %}
+            <div class="qr-plate"><canvas id="pair-qr"></canvas></div>
+            {% else %}
+            {% comment %}
+            No symbol rather than one no phone can use -- see `_pending_ticket`.
+            {% endcomment %}
+            <div class="qr-plate qr-plate-empty">
+                <span class="hint">No QR: the address below is one the app
+                refuses.</span>
+            </div>
+            {% endif %}
+            <div class="pair-detail">
+                {% if pairing.will_load %}<p>{{ pairing.lead }}</p>{% endif %}
+                <p>
+                    <span class="hint">Or type this code</span><br>
+                    <span class="codebox">{{ pairing.code.code }}</span>
+                </p>
+                <p class="countdown">
+                    Works once, and expires in {{ pairing.code.expires_at|timeuntil }}.
+                </p>
+                {% if pairing.organizations %}
+                <p>
+                    <span class="hint">Works for</span><br>
+                    {% for org in pairing.organizations %}<span class="pill org">{{ org.name }}</span>{% endfor %}
+                </p>
+                {% endif %}
+                <p class="hint">
+                    Server <span class="devid">{{ pairing.url }}</span>
+                </p>
+                {% if pairing.scheme_upgraded %}
+                {% comment %}
+                The QR was written as https because the app accepts nothing
+                else, but this page was reached over http. Behind the load balancer that
+                means nginx is overwriting X-Forwarded-Proto with $scheme, and
+                the same fault leaves request.is_secure() false everywhere
+                else. Pairing works; say why it needed rescuing.
+                {% endcomment %}
+                <div class="status-box warning" style="margin-top:0.5rem;">
+                    This page was served over <span class="devid">http</span>,
+                    so the QR was written as
+                    <span class="devid">https</span> &mdash; the app accepts
+                    nothing else. Pairing will work, but the cause is worth
+                    fixing: nginx is passing
+                    <span class="devid">X-Forwarded-Proto&nbsp;$scheme</span>
+                    instead of the load balancer's value, which also leaves secure
+                    cookies and HSTS off for every request.
+                </div>
+                {% endif %}
+
+                {% if not pairing.will_load %}
+                {% comment %}
+                The app connects over https only and the build carries no ATS
+                exception, so a cleartext address fails inside the phone before
+                anything is sent. Say it here, where the address is fixable.
+                {% endcomment %}
+                <div class="status-box error" style="margin-top:0.5rem;">
+                    The phone will refuse <b>{{ pairing.url }}</b>: the app
+                    connects over <span class="devid">https</span> only, so no
+                    QR was generated. This address is the one <i>this page</i>
+                    was served over &mdash; open the site at its
+                    <span class="devid">https</span> address and generate the
+                    code again, or set
+                    <span class="devid">DEVICE_PAIRING_BASE_URL</span> to pin it
+                    regardless of how the page was reached.
+                </div>
+                {% endif %}
+
+                {% if not pairing.reachable %}
+                {% comment %}
+                A loopback address resolves on the machine serving this page
+                and nowhere else, so the phone would fail to reach anything
+                and the enrolment would simply time out. Better to say so than
+                to let a working server look dead.
+                {% endcomment %}
+                <div class="status-box error" style="margin-top:0.5rem;">
+                    This page was reached at <b>{{ pairing.url }}</b>, which the
+                    phone cannot resolve. Open the site by its network address,
+                    or set <span class="devid">DEVICE_PAIRING_BASE_URL</span>,
+                    and generate the code again.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card device-list">
+        <h2>Your devices</h2>
+        <div class="info-box">
+            Each paired phone holds the keys that let it open a verification
+            document with <b>no network</b>. Pairing, re-keying and syncing are
+            all done by scanning a code from this page: the code carries only
+            this server's address and a one-time password, and the phone
+            fetches everything else over an encrypted connection.
+            What a phone may read follows <b>you</b>, not the handset:
+            {% if restricted_tier %}
+            your phones can see the holder's details.
+            {% else %}
+            your phones confirm a document is genuine but cannot read the
+            holder's details. A site administrator changes that.
+            {% endif %}
+        </div>
+
+        {% if devices %}
+        <table class="devices">
+            <thead>
+                <tr>
+                    <th>Device</th><th>Access</th>
+                    {% if organizations %}<th>Works for</th>{% endif %}
+                    <th>Status</th><th>Last sync</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for device in devices %}
+                <tr {% if not device.is_active %}class="revoked"{% endif %}>
+                    <td>
+                        <span class="who">{{ device.label }}</span><br>
+                        <span class="devid">{{ device.device_id }}</span><br>
+                        {# App Attest, as the last check found it. #}
+                        <span class="attest{% if device.attest_status == 'failed' %} failed{% endif %}"
+                              {% if device.attest_detail %}title="{{ device.attest_detail }}"{% endif %}>App Attest: {{ device.attest_label }}</span>
+                        {% if device.is_active %}
+                        {% comment %}
+                        The name is the owner's to choose, and this is where
+                        it is chosen. It is presentation only -- nothing signs
+                        it and no credential carries it -- so unlike Sync and
+                        Re-key there is no ticket and nothing for a phone to
+                        scan. A revoked phone is offered nothing, exactly as
+                        it is offered no other operation.
+                        {% endcomment %}
+                        <details class="rename">
+                            <summary>Rename</summary>
+                            <form method="post" action="{% url 'devices_rename' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="device_id" value="{{ device.device_id }}">
+                                <input type="text" name="label" maxlength="120"
+                                       value="{{ device.label }}"
+                                       aria-label="What this phone is called">
+                                <button type="submit" class="btn-op">Save</button>
+                            </form>
+                        </details>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if device.restricted_tier %}
+                        <span class="pill tier">Holder details</span>
+                        {% else %}
+                        <span class="pill off">Document only</span>
+                        {% endif %}
+                    </td>
+                    {% if organizations %}
+                    <td>
+                        {% if device.is_active %}
+                        {% comment %}
+                        What the phone is told at its next sync: the
+                        organizations it offers in its chooser and names in
+                        its log. Not what it may read -- every phone reads
+                        every organization's documents. The boxes are the
+                        organizations this person may enter, and nothing
+                        else; clearing one ends the link without deleting
+                        it, since the phone may still be holding records it
+                        wrote for that organization.
+                        {% endcomment %}
+                        {% for org in device.works_for %}<span class="pill org">{{ org.name }}</span>{% empty %}<span class="hint">none</span>{% endfor %}
+                        <details class="rename orgs">
+                            <summary>Change</summary>
+                            <form method="post" action="{% url 'devices_organizations' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="device_id" value="{{ device.device_id }}">
+                                <div class="org-boxes">
+                                    {% for org in organizations %}
+                                    <label>
+                                        <input type="checkbox" name="organizations" value="{{ org.id }}"
+                                               {% if org.id in device.works_for_ids %}checked{% endif %}>
+                                        {{ org.name }}
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                                <button type="submit" class="btn-op">Save</button>
+                            </form>
+                        </details>
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                    <td>
+                        {% if not device.is_active %}
+                        <span class="pill off">Revoked</span>
+                        {% elif device.keys_stale %}
+                        <span class="pill warn">Keys stale</span>
+                        {% else %}
+                        <span class="pill ok">Active</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if device.last_sync_at %}{{ device.last_sync_at|timesince }} ago
+                        {% else %}<span class="hint">never</span>{% endif %}
+                    </td>
+                    <td style="text-align:right;">
+                        {% if device.is_active %}
+                        {% comment %}
+                        Sync and Re-key mint a ticket and show its QR; neither
+                        does anything to the phone by itself. The work happens
+                        when the phone scans it and connects -- which is why
+                        the same three buttons cannot put a key on a handset
+                        that is not here to ask for one.
+                        {% endcomment %}
+                        <div class="row-actions">
+                            <form method="post" action="{% url 'devices_ticket' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="purpose" value="sync">
+                                <input type="hidden" name="device_id" value="{{ device.device_id }}">
+                                <button type="submit" class="btn-op"
+                                        title="Show a QR this phone can scan to pull fresh keys">Sync</button>
+                            </form>
+                            {% comment %}
+                            A re-key changes the key this row trusts and
+                            nothing on the handset it replaces, which keeps
+                            the keys it holds until its lease ends.
+                            Revoke reaches no offline phone
+                            either: it stops the old one
+                            syncing and records it as lost, and the leases'
+                            end is the bound. The confirmation says both
+                            before the QR is minted.
+                            {% endcomment %}
+                            <form method="post" action="{% url 'devices_ticket' %}"
+                                  data-confirm="Re-key {{ device.label }}? Use this for a phone that was reinstalled or restored. If the old phone was lost or stolen, neither a re-key nor Revoke reaches it while it is offline: it keeps reading documents with the keys it holds {% if device.lease_expires_at %}until {{ device.lease_expires_at|date:'j M Y, H:i' }}{% else %}until they expire{% endif %}. Revoke a lost phone: that records it as lost and stops it syncing again.">
+                                {% csrf_token %}
+                                <input type="hidden" name="purpose" value="rekey">
+                                <input type="hidden" name="device_id" value="{{ device.device_id }}">
+                                <button type="submit" class="btn-op"
+                                        title="For a phone that was reinstalled or restored and has lost its key">Re-key</button>
+                            </form>
+                            <form method="post" action="{% url 'devices_revoke' %}"
+                                  data-confirm="Revoke {{ device.label }}? It stops receiving keys, and the ones it holds expire. This cannot be undone.">
+                                {% csrf_token %}
+                                <input type="hidden" name="device_id" value="{{ device.device_id }}">
+                                <button type="submit" class="btn-revoke">Revoke</button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">
+            No phones paired yet. Pair one to check documents without a network.
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="card pair-card">
+        <h2>Pair a phone</h2>
+        <form method="post" action="{% url 'devices_ticket' %}">
+            {% csrf_token %}
+            <input type="hidden" name="purpose" value="enrol">
+            <div class="form-group" style="max-width:22rem; margin-bottom:0.6rem;">
+                <label for="label">Name this phone</label>
+                <input type="text" id="label" name="label" maxlength="120"
+                       placeholder="e.g. Field team 3 &mdash; iPhone 14">
+                <span class="hint">
+                    What this handset is listed as here. You can change it
+                    later; leave it blank and the phone supplies its own.
+                </span>
+            </div>
+            {% if organizations %}
+            {% comment %}
+            What the new phone starts out working for. Pre-ticked with the
+            organization this session is working in, or the only one there
+            is (`_pairing_preselect`). Only a pairing carries these: a sync
+            or re-key leaves an existing phone's links alone.
+            {% endcomment %}
+            <div class="form-group" role="group" aria-labelledby="pair-works-for"
+                 style="max-width:22rem; margin-bottom:0.6rem;">
+                <label id="pair-works-for">Works for</label>
+                <div class="org-boxes">
+                    {% for org in organizations %}
+                    <label>
+                        <input type="checkbox" name="organizations" value="{{ org.id }}"
+                               {% if org.id in pairing_organizations %}checked{% endif %}>
+                        {{ org.name }}
+                    </label>
+                    {% endfor %}
+                </div>
+                <span class="hint">
+                    The organizations the phone offers to work for after it is
+                    unlocked, and names in its activity log. It still reads
+                    every organization's documents.
+                </span>
+            </div>
+            {% endif %}
+            <button type="submit" class="btn-pair">Pair a phone</button>
+            <span class="hint" style="margin-left:0.5rem;">
+                Every code works once and expires in {{ pairing_ttl_minutes }} minutes.
+                Keys refresh every {{ lease_days }} days.
+            </span>
+        </form>
+    </div>
+    </div>{# /.device-cols #}
+
+    {% include "includes/branding_footer.html" %}
+</div>
+
+{% if pairing %}
+{% comment %}
+The payload is rendered into a data attribute rather than into a script
+literal: it already contains quotes and braces, and a stray character inside a
+JS string literal breaks every handler in the block, not just this one.
+{% endcomment %}
+<div id="pair-payload" data-payload="{{ pairing.payload }}" style="display:none;"></div>
+<script nonce="{{ csp_nonce }}">
+(function () {
+    var holder = document.getElementById('pair-payload');
+    var canvas = document.getElementById('pair-qr');
+    if (!holder || !canvas || typeof qrcode !== 'function') { return; }
+
+    var qr = qrcode(0, 'M');
+    // Byte mode, and deliberately so: the ticket payload is JSON, which has
+    // lowercase and braces outside the QR alphanumeric charset. The document
+    // symbols ask for Alphanumeric; this one cannot and must not.
+    qr.addData(holder.dataset.payload, 'Byte');
+    qr.make();
+
+    var cells = qr.getModuleCount();
+    var quiet = 4;
+    var scale = 6;
+    var size = (cells + quiet * 2) * scale;
+    canvas.width = size;
+    canvas.height = size;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#000000';
+    for (var r = 0; r < cells; r++) {
+        for (var c = 0; c < cells; c++) {
+            if (qr.isDark(r, c)) {
+                ctx.fillRect((c + quiet) * scale, (r + quiet) * scale, scale, scale);
+            }
+        }
+    }
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "admin/base_site.html" %}
+{% load admin_urls %}
+{% comment %}
+Asked before any credential is revoked from Django admin: how many, which,
+and why. Revocation cannot be undone, so the action does nothing before
+this page is answered with a reason.
+{% endcomment %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">Home</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+&rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+&rsaquo; Revoke
+</div>
+{% endblock %}
+
+{% block content %}
+<p>
+    Revoke <strong>{{ count }}</strong> credential{{ count|pluralize }}?
+    This cannot be undone. Each document stops passing on every phone at the
+    phone&rsquo;s next sync, and its holder must be verified again for a new one.
+</p>
+<ul>
+    {% for credential in credentials %}
+    <li>{{ credential.credential_id }} &middot; {{ credential.organization }} &middot; issued {{ credential.issued_at|date:"M j, Y" }}</li>
+    {% endfor %}
+</ul>
+<form method="post">
+    {% csrf_token %}
+    {% for credential in credentials %}<input type="hidden" name="{{ action_checkbox_name }}" value="{{ credential.pk }}">
+    {% endfor %}
+    <input type="hidden" name="select_across" value="0">
+    <input type="hidden" name="shown" value="{{ count }}">
+    <input type="hidden" name="action" value="revoke_selected">
+    <input type="hidden" name="post" value="yes">
+    {% if siblings %}
+    <p>
+        The same operator also issued these about the same person, at the
+        same organization, within one sign-in. One verification may be logged
+        more than once, so they can be copies of the same document. Tick any
+        that should be revoked too:
+    </p>
+    <ul>
+        {% for credential in siblings %}
+        <li><label>
+            <input type="checkbox" name="also" value="{{ credential.pk }}"
+                   {% if credential.pk|stringformat:"s" in ticked %}checked{% endif %}>
+            {{ credential.credential_id }} &middot; {{ credential.organization }} &middot; issued {{ credential.issued_at|date:"M j, Y H:i" }}
+        </label></li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    <p>
+        <label for="id_reason">Reason, kept with each revocation:</label><br>
+        <input type="text" name="reason" id="id_reason" value="{{ reason }}"
+               maxlength="180" size="60" required>
+    </p>
+    {% if reason_missing %}<p class="errornote">Say why these are being revoked.</p>{% endif %}
+    {% if changed %}<p class="errornote">The selection changed since this page was shown. Check the list again.</p>{% endif %}
+    <input type="submit" value="Yes, revoke {{ count }}{% if siblings %} and any ticked{% endif %}">
+    <a href="{% url opts|admin_urlname:'changelist' %}" class="button">No, go back</a>
+</form>
+{% endblock %}

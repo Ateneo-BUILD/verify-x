@@ -1,0 +1,1942 @@
+{% extends "base.html" %}
+{% load static %}
+{% load demo %}
+
+{% block title %}Verification Document{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<style>
+
+    /* ---- the sheet, and it is the SAME BOX in both media ---------------
+       `.doc-page` is 188 x 273 mm on screen exactly as it is on paper, so
+       what the operator is looking at IS the printed page. That is the rule
+       the cut-out block below has always followed -- "sized in millimetres
+       on screen as well as on paper, so the preview IS what comes out of the
+       printer" -- applied to the whole sheet.
+
+       It is not only honesty. It is what makes the fit MEASURABLE: the
+       fitter below reads this layout in the browser, and it can only be
+       trusted if the box it measures is the box that prints. While the two
+       media disagreed -- a 45 px logo here against 34 px there, 0.8 rem rows
+       against a tier's points -- nothing measured on screen said anything
+       about paper. Every rule inside `.doc-page` is declared once, for
+       both; the print block at the end has the surrounding chrome to hide
+       and almost nothing else.
+
+       BOTH dimensions clear the page box, on BOTH papers, and neither meets
+       it. `@page` sets a 10 mm margin and does not name a size, so the page
+       box is whatever paper is loaded; the sheet is sized to the SMALLER of
+       A4 and Letter in each direction, which is a different sheet in each:
+
+                        printable at 10 mm      the sheet takes   clear
+           A4  210x297      190 x 277              188 x 257      2 / 20 mm
+           Letter 216x279   196 x 259              188 x 257      8 /  2 mm
+
+       A4 governs the width, Letter the height. One fixed sheet rather than a
+       sheet per paper, because the fitter measures this box in the BROWSER,
+       before any paper is chosen -- a box that changed with the printer
+       would make every measurement on this page a guess.
+
+       Page boxes round, and a block sized to MEET the sheet exactly is a
+       block that spills on the printer that rounds the other way. Clear it,
+       never meet it -- the same rule as the 0.4 mm module floor.
+
+       A width that met its limit exactly would be worse than a height that
+       did. A horizontal overflow does not fail like a vertical one: rather
+       than a second sheet it gives a CLIPPED right edge, or a second sheet
+       carrying a 2 mm strip -- so it is the less obvious of the two and the
+       more worth clearing.
+
+       The height is set by Letter, which is 18 mm shorter than A4. The
+       card's footprint below the cut line does not move, and cannot: it is
+       fixed by the 0.4 mm module floor, so the block above the cut line is
+       what pays. What that costs is measured by rendering the document, not
+       reasoned about here. */
+    .doc-stage { overflow-x: auto; padding: 3px; }
+    .doc-page {
+        width: 188mm;
+        height: 257mm;
+        box-sizing: border-box;
+        background: #fff;
+        margin: 0 auto;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        /* How much the certificate has had to give up to live in the space
+           the card leaves it. 1 until fitDocument() says otherwise, and
+           written there as an INLINE style so it travels with outerHTML into
+           the Save-as-PDF window, which has no fitter of its own. */
+        --fit: 1;
+    }
+
+    /* ---- the PAPER the sheet is printed on, on screen only -------------
+       `.doc-page` is the printable area, not the page. On paper the `@page`
+       margin holds it away from the edge; on screen there was nothing
+       holding it away from anything, so the operator saw a sheet whose
+       header, field rules and footer ran clean off the left and right edges
+       of the white. That is not what comes out of the printer, and a preview
+       that misreports its own margins is worse than no preview -- it is the
+       one thing somebody checks the layout against before pressing Print.
+
+       So the sheet now sits inside the paper, at the offsets the PDF
+       actually measures rather than at the ones `@page` nominally asks for:
+
+           top     10 mm   the page box; the sheet is flush to its top
+           sides   11 mm   10 mm of page box + half the 2 mm the sheet clears
+                           the printable width by, because `margin: 0 auto`
+                           centres it in what is left
+           bottom  30 mm   297 - 10 - 257; the sheet does not reach the foot
+                           of the page box, and pretending it does would hide
+                           exactly the room the crop marks hang into
+
+       The paper drawn here is A4, and the sheet now fits Letter too. Only
+       the white around the sheet differs between them, so a Letter office
+       sees a preview whose SHEET is exactly what its printer produces,
+       inside a paper 18 mm too long. Drawing the other paper would mean
+       knowing which one is in the tray, which CSS cannot ask.
+
+       Read those off what a printed PDF measures, not off `@page`:
+       the two differ by that 1 mm a side, and a preview drawn from the
+       nominal margin would be wrong by precisely the amount that makes a
+       preview worth having.
+
+       SCREEN ONLY, and that is structural rather than tidy. This is the one
+       box in this stylesheet that is NOT the same in both media -- it exists
+       because print has `@page` and screen has nothing. Declared in an
+       `@media screen` block it cannot reach paper at all: `@page` would
+       apply its margin to a 210 mm box inside a 190 mm printable area and
+       paginate, and `printStylesheet()` drops a screen-only query on its way
+       to the Save-as-PDF window. A rule in the print block that undid this
+       would be one deletion away from that failure; a rule print never sees
+       is not.
+
+       It costs the fitter nothing, which is the property to preserve if this
+       ever moves: everything it measures is inside `.doc-page`, whose box is
+       untouched. */
+    @media screen {
+        .doc-paper {
+            width: 210mm;
+            height: 297mm;
+            box-sizing: border-box;
+            padding: 10mm 11mm 30mm;
+            margin: 0 auto;
+            background: #fff;
+            /* An OUTLINE, not a border: `box-sizing` would otherwise take the
+               two pixels out of the padding and shift the sheet off the
+               margin this box exists to draw honestly. */
+            outline: 1px solid var(--border-color);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+    }
+
+    /* ---- everything above the cut line --------------------------------
+       This block absorbs the sheet's slack and is CLIPPED rather than
+       allowed to grow. That is the guarantee the card below asked for: it is
+       a fixed printed footprint carrying the offline credential, and it must
+       never be pushed off the page by a long address or a 36-field
+       organization.
+
+       Nothing is ever actually clipped, because fitDocument() shrinks this
+       block until it fits. The overflow rule is the guarantee; the fitter is
+       the mechanism. Keeping both means a failure of the second is a small
+       document rather than a second sheet -- and it is reported, not
+       silent. */
+    .doc-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        padding: 0;
+    }
+
+    .doc-header {
+        text-align: center;
+        border-bottom: 2px solid var(--primary-color);
+        padding-bottom: 0.3rem;
+        margin-bottom: 0.4rem;
+    }
+    .doc-header img {
+        max-height: 34px;
+        width: auto;
+    }
+    .doc-title {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        margin-top: 0.4rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    /* Which organization performed the verification. This is the artefact
+       that leaves the building, so it says so on its face. */
+    .doc-org {
+        display: flex; align-items: center; justify-content: center;
+        gap: 0.4rem; margin-top: 0.4rem;
+    }
+    .doc-org img { max-height: 28px; max-width: 90px; width: auto; }
+    .doc-org .doc-org-name {
+        font-size: 0.8rem; font-weight: 700; color: var(--secondary-color);
+    }
+
+    .doc-transaction-type {
+        text-align: center;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--secondary-color);
+        background: #f0f4f8;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        padding: 0.4rem 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+
+    /* ---- the identity block --------------------------------------------
+       The sheet states the holder as one person rather than as rows of a
+       table.
+
+       A flat label/value grid would name the person in three separate rows
+       -- Given, Middle, Last -- and so never once; put the two ID numbers at
+       rows five and six of as many as thirty-six; and make the portrait a
+       table cell that a dense layout shrinks below what can be compared
+       against the face of the person standing at the counter. All three are
+       the same fault: treating the holder as data rather than as the
+       document's subject.
+
+       The vocabulary is `static/cardcanvas.js`'s -- its ink, its blue rule,
+       its mono for identifiers -- so this sheet and the card the holder
+       saves to their phone describe a person the same way: they agree about
+       WHO, and about how it looks. */
+    .doc-hero {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2mm;
+        padding: 3mm 0 2mm;
+    }
+    /* A FLOOR, not a tier. The portrait is what the document is checked
+       against, so it is the last thing to give way and it never goes below
+       16 mm: 8 mm is too small to compare against a face. */
+    /* A known BOX, not a known width.
+
+       `height: auto` makes the sheet's height budget depend on the aspect
+       ratio of whatever eVerify returned, which nothing here controls. This
+       app's own sample portraits are square, so a square fixture measures a
+       layout that holds -- and a 3:4 capture, which is an ordinary shape for
+       an ID photograph, is 10 mm taller at the same width and blows the row
+       form, where the portrait's height IS the hero's height. Found by
+       rendering the real document and looking at it.
+
+       So both dimensions are set and the image is fitted inside, which is
+       exactly what `drawFace()` does on the card: aspect fit, never crop --
+       squaring a portrait off is how you cut somebody's chin off. */
+    .doc-hero-face {
+        width: max(16mm, calc(30mm * var(--fit)));
+        height: max(16mm, calc(30mm * var(--fit)));
+        object-fit: contain;
+        object-position: center;
+        border-radius: 1mm;
+        border: 1px solid var(--border-color);
+        background: #eef2f6;
+        display: block;
+    }
+    /* Demo mode: the photo is the one field that cannot be redacted as text. */
+    .doc-hero-face.demo-blur { filter: blur(10px); }
+    .doc-hero-name {
+        font-size: max(11pt, calc(19pt * var(--fit)));
+        font-weight: 700;
+        color: #16202b;
+        line-height: 1.12;
+        text-align: center;
+        letter-spacing: -0.015em;
+        /* Wraps rather than clips: a 132-character holder name does occur,
+           and a certificate that cuts somebody's name in half is worse
+           than one that runs to three lines. */
+        max-width: 150mm;
+        overflow-wrap: anywhere;
+    }
+    .doc-hero-ids {
+        font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+        font-size: max(6pt, calc(8.5pt * var(--fit)));
+        color: #5d6d7c;
+        text-align: center;
+    }
+    .doc-hero-rule {
+        height: 1.2mm;
+        background: var(--primary-color);
+        margin: 2mm 0 2.5mm;
+        flex: 0 0 auto;
+    }
+
+    /* ---- the second fit, for a sheet the first one cannot fit -----------
+       Measured: a centred certificate holds to 22 displayed fields, and at
+       36 it is still 17.3 mm over the page once EVERY floor in this
+       stylesheet has bottomed out -- 5.5 pt rows, an 11 pt name, a 16 mm
+       portrait. Shrinking further is not available and would not be worth
+       having if it were.
+
+       What costs the height is the centred stack itself: the portrait sits
+       ABOVE the name rather than beside it, so it spends its whole 16 mm on
+       the sheet's vertical budget. Beside the name it spends almost none --
+       the name and the two ID numbers are about as tall as the portrait
+       already. That is the same finding the footer recorded one section
+       down, where marks under the text cost 18 mm and beside it cost
+       nothing.
+
+       So a document that cannot fit the centred form falls back to this one
+       rather than to a smaller one. It is applied by the fitter, which then
+       measures again from the top -- see fitDocument(). */
+    .doc-page.doc-tight .doc-hero {
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 4mm;
+        padding: 2mm 0 1.5mm;
+    }
+    .doc-page.doc-tight .doc-hero-name {
+        text-align: left;
+        max-width: 120mm;
+    }
+    .doc-page.doc-tight .doc-hero-ids { text-align: left; }
+    .doc-page.doc-tight .doc-hero-rule { margin: 1.5mm 0 2mm; }
+
+    /* And the field list pairs up, which is the reduction that actually
+       matters. Measured at 36 fields: the list is 92.4 mm of a 193.2 mm
+       block, so no amount of shaving the certificate above it makes the
+       sheet -- but two columns halve the ROW COUNT, which gives back about
+       40 mm and lets the type come back UP. A 36-field document prints
+       larger this way than the 6 pt that shrinking alone would leave.
+
+       Reading order is the cost, and it is why this is a fallback rather
+       than the layout: one column makes the order a site admin arranged
+       unambiguous, and down-then-across is a weaker promise. An organization
+       displaying few enough fields to fit never sees it.
+
+       A long value spans both pairs rather than wrapping to three lines in a
+       33% column -- the two address fields are the longest values eVerify
+       returns and they are displayed by default. */
+    .doc-page.doc-tight .doc-fields {
+        grid-template-columns: 17% 33% 17% 33%;
+    }
+    .doc-page.doc-tight .doc-fields .th.wide { grid-column: 1; }
+    .doc-page.doc-tight .doc-fields .td.wide { grid-column: 2 / -1; }
+
+    /* The rest of the fields, under the statement rather than instead of it.
+       Hairlines rather than a full cell grid, so the list reads as the
+       supporting detail it is -- and so the rules do not fight the blue one
+       above them for attention. */
+    .doc-fields {
+        display: grid;
+        grid-template-columns: 34% 66%;
+        margin-bottom: 2mm;
+    }
+    .doc-fields .th,
+    .doc-fields .td {
+        border-bottom: 1px solid #edf1f5;
+        padding: calc(0.14rem * var(--fit)) 0.35rem;
+        font-size: max(5.5pt, calc(8.5pt * var(--fit)));
+        line-height: calc(1.05 + 0.2 * var(--fit));
+        text-align: left;
+        overflow-wrap: anywhere;
+        min-width: 0;
+    }
+    .doc-fields .th {
+        font-weight: 600;
+        color: #6b7a89;
+    }
+    .doc-fields .td { color: var(--text-color); }
+    /* The day a computed value holds for, beside it: an age is only true
+       as of a date. */
+    .doc-fields .td .as-of {
+        font-size: 0.8em;
+        color: #8b98a5;
+        margin-left: 0.35em;
+    }
+
+    .doc-footer {
+        font-size: 0.7rem;
+        color: #999;
+        border-top: 1px solid var(--border-color);
+        padding-top: 0.5rem;
+        margin-top: 0.75rem;
+        /* A ROW: the lines on the left, the two marks on the right.
+
+           Marks under the text rather than beside it would cost the
+           height of the text block -- about 18 mm, measured -- which at 36
+           displayed fields leaves 1.36 mm of page and spills a long holder
+           name onto a second sheet. Beside the text they cost nothing, which
+           is also why the marks need no tier of their own. */
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 1rem;
+        /* Pinned to the FOOT of the block above the cut line, so the slack
+           the fitter leaves sits between the fields and the footer rather
+           than between the footer and the card. The signature lines and the
+           two marks belong at the bottom of the sheet, not floating in the
+           middle of it. */
+        margin-top: auto;
+        flex: 0 0 auto;
+    }
+    .doc-footer .transaction-id {
+    }
+    /* Set in CSS and not on the element, because the row's `display` is what
+       the script switches on -- an inline rule here would be one more thing
+       that has to be written twice. */
+    #doc-stamp-qr {
+        align-items: flex-end;
+        gap: 0.9rem;
+        flex-shrink: 0;
+    }
+    /* Sized so the SEAL MATCHES THE SYMBOL, which is not the same as
+       giving the two boxes the same height.
+
+       `PSAAuthenticationStamp.png` is a round mark on a square canvas and its
+       ink covers 85.2% of that canvas -- measured, not guessed. So at an
+       equal box the printed seal came out about 17 mm against the symbol's
+       20 and read as the smaller of the two. The box is the symbol's height
+       over 0.852; the ink then lands on 20 mm and the pair look like a pair.
+
+       Only the footer's seal. The card's is sized by what the strip can
+       afford, which is a different question with a different answer.
+
+       In millimetres, and in BOTH media, like everything else inside the
+       sheet now. 23.5 mm is what 88.7 px was measuring anyway -- 23.5 x
+       3.7795 is 88.82 -- so this is the same mark it always was, said once
+       instead of twice. Neither it nor the symbol beside it scales with
+       `--fit`: both have a physical floor a reader's camera enforces, which
+       is precisely why the certificate is the block that gives way. */
+    #doc-stamp {
+        height: 23.5mm;   /* 20 / 0.852 -- ink to match the symbol */
+        width: auto;
+    }
+
+    /* ---- the validation QR, beside the seal --------------------------
+       The one symbol on this document meant to be read off the paper by
+       whatever camera is to hand -- a webcam at a counter, a phone held at
+       arm's length -- rather than by the verifier app.
+
+       So it carries the transaction id and NOTHING else: 36 characters,
+       uppercase so the encoder can use alphanumeric mode, which is QR
+       version 3 -- 29 modules. At 20 mm that is 0.69 mm per module against
+       the 0.4 mm floor this app enforces, and against the 0.46 mm the card's
+       credential symbol manages at more than twice the width. Fewer modules
+       is what makes a symbol easy, not a bigger square.
+
+       It is not a second credential and does not try to be: the offline half
+       is on the card below the cut line, where it has the width to be. This
+       is the online check, which is what a stranger with a camera can do.
+
+       It also means a document with NO credential still prints a QR. The
+       card below the cut line is hidden without one, and every symbol on it
+       is inside that card, so before this the only symbol on such a document
+       was drawn into something the page never showed. */
+    #doc-validate-qr canvas, #doc-validate-qr img {
+        width: 20mm;
+        height: 20mm;
+        display: block;
+    }
+    .validate-qr-cap {
+        font-size: 5.5pt;
+        color: #8a949e;
+        text-align: center;
+        line-height: 1.2;
+        margin-top: 0.15rem;
+        letter-spacing: 0.02em;
+    }
+
+    /* ---- the cut-out card -------------------------------------------
+       The document does NOT draw a card. It prints the one the holder saves
+       to their phone -- `static/cardcanvas.js`, the same canvas from the same
+       code -- turned ninety degrees so its long side lies across the sheet.
+
+       One design for one object: anybody holding the paper beside the photo
+       on their phone sees the same card, drawn by the same code.
+
+       Everything about the size comes from ONE number on the server,
+       credentials.CARD_PRINT_MM_PER_PX -- 0.063 mm per canvas pixel, so
+       1080 x 2700 prints 68.04 x 170.10 mm and a QR module lands at 0.504 mm
+       against the 0.4 mm floor -- larger than a 48.8 mm CSS card at 113
+       modules would give (0.432), on a block 7.5 mm shorter. */
+    /* `flex: 0 0 auto` is the reservation. As the last child of the sheet's
+       flex column it takes its natural printed height and gives none of it
+       back, and `.doc-body` above it is what absorbs -- and clips. Before
+       this the card was pinned with `margin-top: auto` and a table that grew
+       simply pushed it down and off the page. */
+    .cut-card { display: none; flex: 0 0 auto; }
+    .cut-card.ready { display: block; }
+
+    .cut-sep {
+        border-top: 1px dashed #b9c2cb;
+        margin: 6mm 0 3mm;
+        text-align: center;
+        line-height: 0;
+    }
+    .cut-sep span {
+        background: #fff;
+        padding: 0 0.5rem;
+        font-size: 7pt;
+        color: #9aa4ae;
+        line-height: 1;
+        display: inline-block;
+        transform: translateY(-50%);
+    }
+
+    /* The card lying on its side. The block is the printed footprint, the
+       LONG side across the sheet, and the canvas is exactly that box:
+       drawCutCard() turns the pixels, not the element.
+
+       Not a portrait canvas turned with a CSS transform: a transform does
+       not change layout, so the browser paginates a 170 mm-tall box that
+       prints 68 mm tall. Chrome counts it as overflow; Safari moves it past
+       the page break whole, onto page two on Letter and off the paper on
+       A4. Measured by printing the page through WebKit.
+
+       The cut line and the four crop marks sit OUTSIDE this box, at
+       -1.5 mm. */
+    .cut-block {
+        position: relative;
+        width: {{ card_print_h_mm }}mm;
+        height: {{ card_print_w_mm }}mm;
+        margin: 0 auto;
+        /* An OUTLINE rather than a border: it draws outside the box without
+           taking any of it, so the card is not clipped by the line drawn to
+           help somebody cut it out. */
+        outline: 1px dashed #b9c2cb;
+    }
+    /* Sized in millimetres on screen as well as on paper, so the preview IS
+       what comes out of the printer. */
+    #cut-canvas {
+        display: block;
+        width: {{ card_print_h_mm }}mm;
+        height: {{ card_print_w_mm }}mm;
+    }
+    /* Crop marks, so a guillotine has something to line up on. */
+    .cut-block > .cut-marks { position: absolute; inset: 0; }
+    .cut-block::before, .cut-block::after,
+    .cut-marks::before, .cut-marks::after {
+        content: "";
+        position: absolute;
+        width: 3mm; height: 3mm;
+        border: 0 solid #6b7a89;
+    }
+    .cut-block::before { top: -1.5mm; left: -1.5mm; border-top-width: .3mm; border-left-width: .3mm; }
+    .cut-block::after { top: -1.5mm; right: -1.5mm; border-top-width: .3mm; border-right-width: .3mm; }
+    .cut-marks::before { bottom: -1.5mm; left: -1.5mm; border-bottom-width: .3mm; border-left-width: .3mm; }
+    .cut-marks::after { bottom: -1.5mm; right: -1.5mm; border-bottom-width: .3mm; border-right-width: .3mm; }
+
+    /* ---- fitting, not density tiers ------------------------------------
+       An organization can display as many as 36 fields, 36 rows do not
+       share a sheet with the card at the size the first thirteen use, and
+       the CERTIFICATE is the block that gives way -- the two symbols on the
+       card, the seal and the validation QR all have a physical minimum a
+       camera enforces, and text has none that cannot be recovered by
+       looking closer.
+
+       How far it gives way is measured, not stepped. Hardcoded steps
+       chosen from the ROW COUNT alone in the markup would look like this:
+
+           > 21 rows  ->  6 pt, portrait 0.8 cm
+           > 15 rows  ->  7.5 pt, portrait 1.6 cm
+           otherwise  ->  8.5 pt, portrait 2 cm
+
+       A row count is a poor proxy for a height. It cannot see a value that
+       wraps to three lines, and the longest values eVerify returns are the
+       two address fields, which are displayed by default. Thirteen fields
+       with a 132-character holder name and a long present address is a
+       taller block than twenty-two short ones, and such steps would call
+       the first of those roomy.
+
+       So `--fit` is measured instead: the fitter lays the real block out
+       and shrinks it until it actually fits. Every size that may give way
+       is written against it, and every one carries its own floor through
+       `max()`, so a fit driven low cannot take the type below reading size
+       or the portrait below 16 mm. */
+
+    /* The two marks are NOT a tier property.
+
+       They would have to be if the footer were a centred stack, because the
+       marks would then cost the sheet the height of the text block and 36
+       fields would have
+       1.36 mm left. Beside the text they cost the page nothing, so the
+       symbol keeps the size that reads easiest on every document: 20 mm over
+       29 modules, 0.69 mm a module. The seal keeps its pairing at 23.5 mm --
+       see below. */
+
+    /* ---- one sheet -------------------------------------------------
+       The printed output is a single page on A4 or on Letter, and the
+       layout obeys that rather than hoping for it.
+
+       @page is what makes the budget knowable. Without it the MARGIN is
+       whatever the browser happens to default to -- and the two paths out
+       of this template disagreed: Print took the browser default while Save
+       as PDF wrote its own 1.5 cm. Both are 10 mm now, so one number
+       governs both.
+
+       The SIZE is deliberately `auto`, which it has to be for two papers:
+       naming A4 here would lay the page out as A4 and then scale it onto
+       Letter, and a 5% shrink takes the card's modules from 0.40 mm to
+       0.38 mm -- under the floor, silently, on the one thing on this sheet
+       that has to survive a camera. With `auto` the page box IS the paper,
+       and the sheet is sized at the top of this stylesheet to fit either.
+
+       .doc-page IS that box, and it is declared once at the top of this
+       stylesheet rather than here: a 188 x 257 mm flex column in both media,
+       with `.doc-body` absorbing the slack and the card as its last child
+       taking a fixed footprint. The card has to be a CHILD -- as a sibling
+       it simply followed a 25 cm block onto page two, every time.
+
+       So this block has almost nothing left to say. It hides the screen
+       chrome around the sheet and stops there; every rule INSIDE the sheet
+       is common to both media, which is what makes the fitter's measurement
+       mean anything. A rule added here that changes the sheet's height is a
+       rule the fitter cannot see, and it will spill a page to prove it. */
+    @page { size: auto; margin: 10mm; }
+
+    @media print {
+        /* .org-banner is a screen affordance -- which organization you are
+           signed into. On paper the document's own header already says so,
+           and left visible it sat ABOVE the page box and pushed the foot of
+           the sheet onto page two. */
+        .app-nav, .org-banner, .transaction-controls, #doc-status, .site-header, .site-footer, .branding-footer, .post-log-controls, .user-records { display: none !important; }
+        /* Neither of the base stylesheet's body layouts holds up on
+           paper in Safari. Its `min-height: 100vh` measures the WINDOW,
+           which printed a blank sheet from a tall one, and its flex column
+           squeezed the Save-as-PDF sheet on Letter, pulling the card up
+           over the certificate. */
+        body { background: #fff; display: block; padding: 0; margin: 0; min-height: 0; }
+        .container { max-width: none; padding: 0; margin: 0; }
+        /* The only difference, and it changes no height: the scroll
+           container that keeps the paper on a narrow window stops being one.
+           The screen ring needs no rule here -- it is on `.doc-paper`, which
+           is declared inside `@media screen` and so was never here to hide. */
+        .doc-stage { overflow: visible; padding: 0; }
+        .cut-card, .cut-block {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+    }
+
+    /* Safari prints CSS millimetres too long. WebKit lays a printed page out
+       at no less than 1.25 times the paper's width in points, where 1.333 is
+       what makes a CSS pixel its true 0.75 pt, and then fits the widest line
+       across the paper. Uncorrected, this sheet printed at 104% on Letter,
+       267.8 mm tall on 259.4 mm of paper, and the card went to a second page.
+
+       0.75 / 0.8 = 0.9375 takes the sheet back to true size on both papers,
+       so the card's module size holds there as it does in Chrome. Type wraps
+       differently at that zoom, so fitDocument() measures at it too; fitted
+       at full size, the footer was clipped from the fullest documents.
+       `font: -apple-system-body` parses only in WebKit, which leaves every
+       other browser's layout alone. If WebKit ever stops doing this the sheet
+       prints at 94%: still one page, and the card's modules at 0.47 mm, still
+       over the 0.4 mm floor. */
+    @supports (font: -apple-system-body) {
+        .doc-page { --print-zoom: 0.9375; }
+        @media print { .doc-page { zoom: var(--print-zoom); } }
+    }
+
+    /* The sheet and what you do with it, side by side on a wide window: the
+       sheet's column is exactly as wide as the paper and the rest goes to a
+       side column that stays in view while the sheet scrolls.
+
+       Screen only, and only from a width where that column still has room
+       for the User Records table. Below it -- and always on paper --
+       .doc-layout is an ordinary block, and the page reads in order: the
+       controls, the records, then the sheet. Nothing here touches a box
+       inside the sheet, which is the only thing the fitter measures. */
+    @media screen and (min-width: 1280px) {
+        .doc-layout {
+            display: grid;
+            grid-template-columns: max-content minmax(0, 1fr);
+            column-gap: 1.25rem;
+            align-items: start;
+        }
+        .doc-layout > .doc-stage { grid-column: 1; grid-row: 1; }
+        .doc-layout > .doc-side {
+            grid-column: 2; grid-row: 1; min-width: 0;
+            position: sticky; top: 1rem;
+        }
+    }
+
+    .transaction-controls {
+        background: #f8f9fa;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 1rem;
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-end;
+        flex-wrap: wrap;
+    }
+    .transaction-controls .form-group {
+        flex: 1;
+        min-width: 200px;
+        margin-bottom: 0;
+        position: relative;
+    }
+    .transaction-controls .form-group label {
+        font-size: 0.75rem;
+        margin-bottom: 0.2rem;
+    }
+    .container button.btn-log {
+        width: auto;
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+        margin-top: 0;
+        white-space: nowrap;
+    }
+    #tt-dropdown {
+        position: absolute;
+        left: 0; right: 0; top: 100%;
+        max-height: 200px;
+        overflow-y: auto;
+        background: #fff;
+        border: 1.5px solid #999;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        z-index: 100;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    /* ---- User Records --------------------------------------------------
+       The person just verified, as every organization has logged them. A
+       screen card like the controls above it: outside the sheet, hidden by
+       the print rules, and absent from the PDF, which copies the sheet
+       alone. Nothing here can change the sheet's height, so the fitter is
+       not affected.
+
+       The table becomes stacked rows when the CARD is narrow, not the
+       window: beside the sheet the window can be wide and the card not, and
+       a four-column table at that width runs its last column out past the
+       card's edge. 560 px of card is where a 640 px window switches. */
+    .user-records { container: ur / inline-size; }
+    .user-records h2 { display: flex; align-items: center; gap: 0.5rem; }
+    .container button.ur-toggle {
+        display: inline-flex; align-items: center; gap: 0.35rem;
+        width: auto; margin: 0; padding: 0; background: none;
+        color: inherit; font: inherit; cursor: pointer;
+    }
+    .container button.ur-toggle:hover { background: none; color: inherit; }
+    .ur-arrow { display: inline-block; font-size: 0.8rem; transition: transform 0.2s; }
+    .ur-toggle[aria-expanded="false"] .ur-arrow { transform: rotate(-90deg); }
+    .ur-count { margin-left: auto; }
+    .ur-lead { margin: 0 0 0.75rem; font-size: 0.85rem; color: #555; }
+    .ur-stats {
+        display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.5rem; margin-bottom: 0.85rem;
+    }
+    .ur-stat {
+        min-width: 0; background: #f8f9fa; border: 1px solid var(--border-color);
+        border-radius: 4px; padding: 0.5rem 0.75rem;
+    }
+    .ur-stat-label {
+        font-size: 0.7rem; font-weight: 600; color: #5c6672;
+        text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .ur-stat-value { font-size: 1.15rem; font-weight: 700; color: var(--secondary-color); }
+    .ur-stat-when { font-size: 0.85rem; font-weight: 700; color: var(--secondary-color); line-height: 1.3; }
+    .ur-stat-sub { font-size: 0.75rem; color: #555; overflow-wrap: anywhere; }
+    #ur-search {
+        width: 100%; padding: 0.5rem 0.6rem; font-size: 0.85rem; font-family: inherit;
+        border: 1.5px solid #999; border-radius: 4px; box-sizing: border-box;
+        margin-bottom: 0.5rem;
+    }
+    #ur-search:focus {
+        outline: none; border-color: var(--primary-color);
+        box-shadow: 0 0 0 2px rgba(0, 82, 155, 0.15);
+    }
+    .ur-paging {
+        display: flex; justify-content: space-between; align-items: center;
+        gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.4rem;
+        font-size: 0.8rem; color: #595959;
+    }
+    .ur-paging-controls { display: flex; align-items: center; gap: 0.5rem; }
+    .ur-paging label { font-size: 0.8rem; font-weight: 400; margin: 0; }
+    .ur-paging select {
+        width: auto; padding: 0.2rem 0.4rem; font-size: 0.8rem;
+        border: 1px solid #999; border-radius: 3px;
+    }
+    .container button.ur-page-btn { width: auto; margin: 0; padding: 0.25rem 0.6rem; font-size: 0.8rem; }
+    .ur-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .ur-table th {
+        text-align: left; padding: 0.45rem 0.2rem;
+        border-bottom: 2px solid var(--border-color);
+        font-size: 0.7rem; font-weight: 700; color: #5c6672;
+        text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .ur-table td {
+        padding: 0.55rem 0.2rem; border-bottom: 1px solid var(--border-color);
+        color: #222; vertical-align: top;
+    }
+    .ur-table td.ur-when {
+        width: 11rem; color: #555; white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+    .ur-table td.ur-org { font-weight: 600; }
+    .ur-table tr.ur-current td { background: #e9f7ec; }
+    .ur-table tr.ur-current td.ur-when { color: #1d6b32; }
+    .ur-tag {
+        display: block; width: max-content; margin-top: 0.2rem;
+        padding: 0.05rem 0.4rem; border: 1px solid var(--success-color);
+        border-radius: 3px; font-size: 0.7rem; font-weight: 700; color: #1d6b32;
+    }
+    .ur-nomatch {
+        margin: 0; padding: 1rem 0.2rem; text-align: center; font-size: 0.85rem;
+        color: #595959; border-bottom: 1px solid var(--border-color);
+    }
+    .ur-note { margin: 0; padding: 0.75rem 0 0.25rem; text-align: center; font-size: 0.85rem; color: #595959; }
+    .ur-note b { display: block; margin-bottom: 0.3rem; font-size: 0.95rem; color: #333; }
+    .ur-error { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 0; }
+    .ur-error span { flex: 1; min-width: 16rem; }
+    .container button.ur-retry { width: auto; margin: 0; padding: 0.45rem 0.9rem; font-size: 0.85rem; }
+    .ur-foot { margin: 0.75rem 0 0; }
+
+    /* ---- Repeats -------------------------------------------------------
+       Two signals, never colour alone. A record of the type being logged is
+       marked with a blue dot and its type in bold, from any organization.
+       One that also COUNTS AS A REPEAT (the server's word: logged here,
+       inside the window, alert on) gets an amber triangle and an amber row,
+       and the line in the Transaction Type bar says how many and when. */
+    .ur-repeat {
+        flex: 1 1 100%; display: flex; align-items: flex-start; gap: 0.6rem;
+        flex-wrap: wrap; border-radius: 4px; padding: 0.5rem 0.7rem;
+        font-size: 0.82rem; line-height: 1.4;
+    }
+    .ur-repeat.ur-repeat-warn {
+        background: #fff4e5; color: #7a4100; border: 1px solid #f0c48a;
+        box-shadow: inset 3px 0 0 #c26a05;
+    }
+    .ur-repeat.ur-repeat-info { background: #eaf2fb; color: #00386a; border: 1px solid #b6cde6; }
+    .ur-repeat.ur-repeat-none { padding: 0.1rem 0; color: #595959; }
+    .ur-repeat-icon { font-size: 1rem; line-height: 1.3; }
+    .ur-repeat-text { flex: 1; min-width: 14rem; }
+    .ur-nowrap { white-space: nowrap; }
+    .container button.ur-repeat-link {
+        width: auto; margin: 0; padding: 0; align-self: center;
+        background: none; border: none; color: inherit; font: inherit; font-weight: 600;
+        text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; cursor: pointer;
+    }
+    .container button.ur-repeat-link:hover { background: none; color: inherit; }
+    .ur-sr {
+        position: absolute; width: 1px; height: 1px; overflow: hidden;
+        clip: rect(0 0 0 0); white-space: nowrap;
+    }
+    .ur-table th.ur-mk, .ur-table td.ur-mk { width: 1.6rem; padding-left: 0; padding-right: 0; text-align: center; }
+    .ur-dot {
+        display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 50%;
+        background: var(--primary-color); vertical-align: middle;
+    }
+    .ur-warn { color: #c26a05; font-size: 0.9rem; line-height: 1; }
+    .ur-table tr.ur-same td.ur-type { color: var(--secondary-color); font-weight: 700; }
+    .ur-table tr.ur-again td { background: #fff4e5; }
+    .ur-table tr.ur-again td.ur-type { color: #7a4100; font-weight: 700; }
+    .ur-table tr.ur-flash td { animation: ur-flash 2.2s ease-out; }
+    @keyframes ur-flash { 0%, 35% { background: #ffd89a; } }
+    @media (prefers-reduced-motion: reduce) {
+        .ur-table tr.ur-flash td { animation: none; }
+        .ur-table tr.ur-flash { outline: 2px solid #c26a05; outline-offset: -2px; }
+    }
+    @container ur (max-width: 560px) {
+        .ur-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .ur-stat-latest { grid-column: 1 / -1; }
+        .ur-table thead { display: none; }
+        .ur-table, .ur-table tbody, .ur-table tr, .ur-table td { display: block; width: auto; }
+        .ur-table tr { padding: 0.6rem 0.1rem; border-bottom: 1px solid var(--border-color); }
+        .ur-table td, .ur-table tr.ur-current td { border: 0; padding: 0.05rem 0; background: none; }
+        .ur-table td.ur-when { width: auto; font-size: 0.75rem; }
+        .ur-table tr.ur-current { background: #e9f7ec; }
+        /* Stacked, the mark rides at the right of the row's first line. */
+        .ur-table tr { position: relative; }
+        .ur-table td.ur-mk { position: absolute; right: 0.3rem; top: 0.6rem; width: auto; }
+        .ur-table tr.ur-again td { background: none; }
+        .ur-table tr.ur-again { background: #fff4e5; }
+    }
+
+    /* ---- the hand-off to the holder's phone ---------------------------
+       A third control on the row that already exists, rather than a
+       panel of its own or a dialog. It costs the page no vertical space and
+       it is where the operator is already looking once the transaction is
+       logged.
+
+       Small on purpose -- it is scanned from across a desk by somebody
+       standing at it, not from across a counter. The payload is a URL of
+       about 45 characters, so the symbol is a low version with large modules
+       and reads at this size. */
+    .handoff {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        align-self: center;
+        border-left: 1px solid var(--border-color);
+        padding-left: 0.75rem;
+    }
+    .handoff[hidden] { display: none; }
+    #handoff-qr canvas, #handoff-qr img {
+        display: block;
+        width: 46px;
+        height: 46px;
+    }
+    .handoff-cap {
+        font-size: 0.7rem;
+        color: #5d6d7c;
+        line-height: 1.3;
+        max-width: 140px;
+    }
+    .handoff-cap b {
+        display: block;
+        color: var(--secondary-color);
+        font-size: 0.75rem;
+    }
+
+    #doc-status {
+        margin-bottom: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        display: none;
+    }
+    #doc-status.success { display: block; background: #e9f7ec; color: #28a745; border: 1px solid #28a745; }
+    #doc-status.error { display: block; background: #fdecea; color: #dc3545; border: 1px solid #dc3545; }
+
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container">
+    {% csrf_token %}
+    {% include "includes/app_nav.html" with active_nav="verify" %}
+    {% include "includes/org_banner.html" %}
+
+    {% comment %}
+    On a wide window the sheet sits on the left at paper size and everything
+    an operator does with it -- the type, Log Transaction, the hand-off, User
+    Records -- sits in a column beside it, held in view while the sheet
+    scrolls. The side column comes FIRST in the markup, so a narrow window
+    still reads it above the sheet; .doc-layout places it
+    on the right only where there is room. See the stylesheet.
+    {% endcomment %}
+    <div class="doc-layout">
+    <div class="doc-side">
+
+    <!-- Transaction Controls (before logging) -->
+    <div class="transaction-controls" id="pre-log-controls">
+        <div class="form-group">
+            <label for="tt-search">Transaction Type</label>
+            <input type="text" id="tt-search" placeholder="Search or select transaction type..." autocomplete="off"
+                   style="width:100%; padding:0.4rem 0.6rem; font-size:0.85rem; border:1.5px solid #999; border-radius:4px; box-sizing:border-box;">
+            <input type="hidden" id="transaction-type" value="">
+            <div id="tt-dropdown" style="display:none;"></div>
+        </div>
+        <button class="btn-log" id="btn-log" disabled>Log Transaction</button>
+        {% if current_org.check_user_records %}
+        {% comment %}
+        The repeat alert: User Records' warning, put where the type is picked
+        and Log is pressed, which is the one moment it can change anything.
+        It informs and never blocks. Written by the User Records script, with
+        textContent only, and moved to the post-log bar once the transaction
+        is logged. See accounts/user_records.py.
+        {% endcomment %}
+        <div class="ur-repeat" id="ur-repeat" role="status" hidden></div>
+        {% endif %}
+    </div>
+
+    <!-- Post-log Controls (after logging) -->
+    <div class="transaction-controls" id="post-log-controls" style="display:none;">
+        <button class="btn-log" id="btn-save-pdf">Save as PDF</button>
+        <button class="btn-log" id="btn-print">Print Document</button>
+        {% comment %}
+        The hand-off. Hidden until there is one, and there is one only when a
+        credential was minted -- the card the phone draws IS the two symbols,
+        and a card with nothing offline on it is the card the cut-out block
+        below already declines to print.
+        {% endcomment %}
+        <span class="handoff" id="handoff" hidden>
+            <span id="handoff-qr"></span>
+            <span class="handoff-cap"><b>Send to phone</b>Scan to save the card to Photos</span>
+        </span>
+    </div>
+
+    <div id="doc-status"></div>
+
+    {% if current_org.check_user_records %}
+    {% comment %}
+    User Records: the person just verified, as every organization has logged
+    them -- when, where, what and who. Above the sheet so it is read before
+    Log Transaction, and outside it so it never prints. WHOSE records is not
+    the page's to say: the server takes the person from this session's
+    verification (accounts/user_records.py), and the page only asks.
+    {% endcomment %}
+    <section class="card user-records" id="user-records" aria-labelledby="ur-title">
+        <h2 id="ur-title">
+            <button type="button" class="ur-toggle" id="ur-toggle"
+                    aria-expanded="true" aria-controls="ur-body">
+                <span class="ur-arrow" aria-hidden="true">&#9660;</span>User Records
+            </button>
+            <span class="role-badge role-admin ur-count" id="ur-count" hidden></span>
+        </h2>
+        <div id="ur-body">
+            <p class="ur-lead">Earlier transactions logged for this National ID, in every organization.</p>
+            <p class="ur-note" id="ur-loading">Looking up records&hellip;</p>
+            <p class="ur-note" id="ur-empty" hidden><b>No earlier records</b>No transaction has been logged for this National ID before, in any organization.</p>
+            <p class="ur-note" id="ur-unavailable" hidden><b>No records to look up</b>This verification returned no ID number to find earlier transactions by.</p>
+            <div class="status-box error ur-error" id="ur-error" hidden>
+                <span>User Records could not be loaded. The verification itself is not affected, and the transaction can still be logged.</span>
+                <button type="button" class="ur-retry" id="ur-retry">Try again</button>
+            </div>
+            <div id="ur-list" hidden>
+                <div class="ur-stats">
+                    <div class="ur-stat">
+                        <div class="ur-stat-label">Records</div>
+                        <div class="ur-stat-value" id="ur-stat-records"></div>
+                    </div>
+                    <div class="ur-stat">
+                        <div class="ur-stat-label">Organizations</div>
+                        <div class="ur-stat-value" id="ur-stat-orgs"></div>
+                    </div>
+                    <div class="ur-stat ur-stat-latest">
+                        <div class="ur-stat-label">Latest</div>
+                        <div class="ur-stat-when" id="ur-stat-when"></div>
+                        <div class="ur-stat-sub" id="ur-stat-org"></div>
+                    </div>
+                </div>
+                <input type="search" id="ur-search" aria-label="Search user records" autocomplete="off"
+                       placeholder="Search date, organization, transaction type or operator...">
+                <div class="ur-paging">
+                    <span id="ur-info" aria-live="polite"></span>
+                    <div class="ur-paging-controls">
+                        <label for="ur-page-size">Show:</label>
+                        <select id="ur-page-size">
+                            <option value="5" selected>5</option>
+                            <option value="15">15</option>
+                            <option value="30">30</option>
+                            <option value="all">All</option>
+                        </select>
+                        <button type="button" class="ur-page-btn" id="ur-prev" aria-label="Previous page" disabled>&laquo;</button>
+                        <button type="button" class="ur-page-btn" id="ur-next" aria-label="Next page">&#187;</button>
+                    </div>
+                </div>
+                <table class="ur-table">
+                    <thead>
+                        <tr>
+                            <th scope="col" class="ur-mk"><span class="ur-sr">Match</span></th>
+                            <th scope="col">Date &amp; time</th>
+                            <th scope="col">Organization</th>
+                            <th scope="col">Transaction type</th>
+                            <th scope="col">Operator</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ur-rows"></tbody>
+                </table>
+                <p class="ur-nomatch" id="ur-nomatch" hidden></p>
+                <p class="hint" id="ur-truncated" hidden></p>
+            </div>
+            <p class="hint ur-foot">Shown on screen only. Not printed on the document or saved in the PDF.</p>
+        </div>
+    </section>
+    {% endif %}
+    </div>{# /.doc-side #}
+
+    <!-- A4 Document -->
+    {% comment %}
+    No tier class any more. How far the certificate has to shrink is measured
+    by fitDocument() against this sheet's real layout rather than guessed
+    from the row count -- see the stylesheet.
+
+    .doc-paper is the A4 sheet of paper, drawn only on screen, holding the
+    printable area away from the edge exactly as `@page` does on the printer.
+    .doc-stage keeps it scrollable on a window narrower than the paper
+    instead of letting it burst the page.
+    {% endcomment %}
+    <div class="doc-stage">
+    <div class="doc-paper">
+    <div class="doc-page" id="doc-page">
+    <div class="doc-body" id="doc-body">
+        <div class="doc-header">
+            <img src="{% static 'nationalid-everify-logo.png' %}" alt="National ID eVerify">
+            <div class="doc-title">National ID Authentication Result</div>
+            {% if current_org %}
+            <div class="doc-org">
+                {% if current_org.logo_data %}<img src="{{ current_org.logo_data }}" alt="">{% endif %}
+                <span class="doc-org-name">{{ current_org.name }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        {% comment %}
+        The holder, once. Portrait, name and both ID numbers were chosen on the
+        server by eVerify's own key -- the same helper the phone card uses, so
+        the paper and the card cannot name different people -- and each number
+        is PRINTED under this organization's own label, which is editable.
+
+        Every part is conditional. An organization that displays none of these
+        fields gets no identity block rather than an empty one.
+        {% endcomment %}
+        {% if face_value or holder_name or holder_numbers %}
+        <div class="doc-hero">
+            {% if face_value %}
+            <img src="{{ face_value }}" alt="Face Photo" id="doc-hero-face"
+                 class="doc-hero-face{% if demo_mode %} demo-blur{% endif %}">
+            {% endif %}
+            {% if holder_name %}<div class="doc-hero-name">{{ holder_name }}{% if holder_age %}, {{ holder_age }}{% endif %}</div>{% endif %}
+            {% if holder_numbers %}
+            <div class="doc-hero-ids">
+                {% for number in holder_numbers %}{% if not forloop.first %} &middot; {% endif %}{{ number.label }} {{ number.value }}{% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        <div class="doc-hero-rule"></div>
+        {% endif %}
+
+        <div class="doc-transaction-type" id="doc-tt-display">-</div>
+
+        {% comment %}
+        Everything the organization displays EXCEPT the holder block above,
+        which the view has already lifted out so nothing is printed twice.
+        A grid rather than a table: two columns of hairline rows, and the
+        label/value pair is what a row is.
+        {% endcomment %}
+        <div class="doc-fields">
+            {% for item in doc_rows %}
+                {% if item.value|length > 60 %}
+                <div class="th wide">{{ item.key }}</div>
+                <div class="td wide">{{ item.value }}</div>
+                {% else %}
+                <div class="th">{{ item.key }}</div>
+                <div class="td">{% if item.value == True %}Yes{% elif item.value == False %}No{% else %}{{ item.value }}{% endif %}{% if item.as_of %}<span class="as-of">(as of {{ item.as_of }})</span>{% endif %}</div>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        <div class="doc-footer">
+            {% comment %}
+            Two children, and the flex rule above puts one at each end: the
+            lines on the left, the seal and the validation symbol on the
+            right.
+            {% endcomment %}
+            <div>
+                {% comment %}
+                The operator's own name, redacted while presenting like it is
+                in the nav. The rest of this document is already masked in
+                Demo Mode, so it is not one anybody would hand over.
+                {% endcomment %}
+                <div>Verification performed by {{ user.full_name|demo_name:demo_mode }}{% if current_org %}, {{ current_org.name }}{% endif %}</div>
+                <div>Location: {{ operator_location_name }}</div>
+                <div id="doc-verified-at"></div>
+                <div class="transaction-id" id="doc-txn-id"></div>
+            </div>
+            <div id="doc-stamp-qr" style="display:none;">
+                <img src="{% static 'PSAAuthenticationStamp.png' %}" alt="PSA Authentication Stamp" id="doc-stamp">
+                {% comment %}
+                To the RIGHT of the seal, and deliberately small: this is the
+                symbol a webcam reads. It carries the transaction id alone, so
+                it is 29 modules where the card's credential symbol is 113 --
+                the modules are half as large again, at 41% of the width.
+                {% endcomment %}
+                <div>
+                    <div id="doc-validate-qr"></div>
+                    <div class="validate-qr-cap">Scan to validate</div>
+                </div>
+            </div>
+        </div>
+    </div>{# /.doc-body -- everything above the cut line ends here #}
+
+    {% comment %}
+    The cut-out card: the holder's phone card, printed on its side.
+
+    A SIBLING of .doc-body and the last child of the sheet, which is what
+    reserves its space: it takes its natural printed footprint and gives none
+    of it back, and the block above is the one that gives way. It must stay
+    outside .doc-body -- inside it, it would be clipped along with everything
+    else the moment the certificate ran long.
+
+    This page draws no card of its own. `static/cardcanvas.js` renders the
+    payload the server returned -- the same renderer, the same payload and
+    the same design the holder saves to Photos -- and drawCutCard() turns it
+    ninety degrees so its long side lies across the sheet.
+
+    Hidden until a credential exists, because a card with nothing offline on
+    it is a card not worth cutting out. `resp.card` arrives only with a mint,
+    so the two cannot get out of step.
+    {% endcomment %}
+    <div class="cut-card" id="cut-card">
+        <div class="cut-sep"><span>&#9986; cut along the dotted line</span></div>
+        <div class="cut-block">
+            <span class="cut-marks"></span>
+            <canvas id="cut-canvas" width="{{ card_canvas_h_px }}" height="{{ card_canvas_w_px }}"></canvas>
+        </div>
+    </div>{# /.cut-card #}
+    </div>{# /.doc-page #}
+    </div>{# /.doc-paper #}
+    </div>{# /.doc-stage #}
+    </div>{# /.doc-layout #}
+
+    {% include "includes/branding_footer.html" %}
+</div>
+
+{% comment %}
+The card below the cut line is the holder's phone card, drawn by the
+renderer that draws it on the phone. One design, one file.
+{% endcomment %}
+<script src="{% static 'cardcanvas.js' %}?v={{ APP_VERSION }}"></script>
+<script nonce="{{ csp_nonce }}">
+(function() {
+    var csrfEl = document.querySelector('[name=csrfmiddlewaretoken]');
+    var csrfToken = csrfEl ? csrfEl.value : '';
+    // No copy of the verification rides in this page. The log is made of
+    // eVerify's answer as the server kept it; all this page names is the
+    // transaction type, picked from the organization's own list.
+
+    // --- Searchable transaction type ---
+    var allTransactionTypes = [];
+    var ttSearch = document.getElementById('tt-search');
+    var ttHidden = document.getElementById('transaction-type');
+    var ttDropdown = document.getElementById('tt-dropdown');
+    var btnLog = document.getElementById('btn-log');
+    var docStatus = document.getElementById('doc-status');
+    var docTtDisplay = document.getElementById('doc-tt-display');
+
+    fetch('/api/lookup-data/').then(function(r) { return r.json(); }).then(function(d) {
+        allTransactionTypes = d.transaction_types || [];
+    });
+
+    // User Records follows the picker: it marks earlier records of the type
+    // picked, and warns when this organization already logged it for this
+    // person. An event rather than a shared variable, because the two
+    // scripts are separate and the card is absent when the switch is off.
+    function announceType(name) {
+        document.dispatchEvent(new CustomEvent('verify:transaction-type',
+            { detail: { name: name } }));
+    }
+
+    function renderTtDropdown(filter) {
+        var q = (filter || '').toLowerCase();
+        var matches = allTransactionTypes.filter(function(tt) {
+            return tt.name.toLowerCase().indexOf(q) >= 0;
+        });
+        ttDropdown.innerHTML = '';
+        matches.forEach(function(tt) {
+            var div = document.createElement('div');
+            div.textContent = tt.name;
+            div.style.cssText = 'padding:0.5rem 0.75rem; cursor:pointer; font-size:0.9rem;';
+            div.addEventListener('mouseenter', function() { this.style.background = '#e8eef3'; });
+            div.addEventListener('mouseleave', function() { this.style.background = ''; });
+            div.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                ttSearch.value = tt.name;
+                ttHidden.value = tt.id;
+                ttDropdown.style.display = 'none';
+                btnLog.disabled = false;
+                docTtDisplay.textContent = tt.name;
+                announceType(tt.name);
+            });
+            ttDropdown.appendChild(div);
+        });
+        if (matches.length === 0) {
+            var empty = document.createElement('div');
+            empty.textContent = 'No transaction types found';
+            empty.style.cssText = 'padding:0.5rem 0.75rem; color:#999; font-size:0.85rem;';
+            ttDropdown.appendChild(empty);
+        }
+        ttDropdown.style.display = (matches.length > 0 || q) ? 'block' : 'none';
+    }
+
+    ttSearch.addEventListener('focus', function() { renderTtDropdown(this.value); });
+    ttSearch.addEventListener('input', function() {
+        ttHidden.value = '';
+        btnLog.disabled = true;
+        docTtDisplay.textContent = '-';
+        announceType('');
+        renderTtDropdown(this.value);
+    });
+    ttSearch.addEventListener('blur', function() {
+        setTimeout(function() { ttDropdown.style.display = 'none'; }, 150);
+    });
+
+    // --- Log Transaction ---
+    var preLogControls = document.getElementById('pre-log-controls');
+    var postLogControls = document.getElementById('post-log-controls');
+
+    btnLog.addEventListener('click', function() {
+        var transactionType = ttHidden.value;
+        if (!transactionType) return;
+        btnLog.disabled = true;
+        btnLog.textContent = 'Logging...';
+
+        fetch('/everify/log-transaction/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ transaction_type: transactionType })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(resp) {
+            if (resp.status === 'ok') {
+                docStatus.textContent = 'Transaction logged successfully.';
+                docStatus.className = 'success';
+                if (resp.verified_at) {
+                    document.getElementById('doc-verified-at').textContent = 'Verification Timestamp: ' + resp.verified_at;
+                }
+                if (resp.transaction_id) {
+                    document.getElementById('doc-txn-id').textContent = 'Transaction ID: ' + resp.transaction_id;
+                    // Beside the seal, and drawn whether or not a credential
+                    // was minted -- the online check does not depend on one.
+                    generateValidateQR(resp.transaction_id);
+                    document.getElementById('doc-stamp-qr').style.display = 'flex';
+                    // The cut-out card, which IS the holder's phone card --
+                    // same payload, same renderer, turned on its side.
+                    drawCutCard(resp.card);
+                    showHandoff(resp.handoff_url, resp.handoff_token);
+                }
+                // Swap controls
+                preLogControls.style.display = 'none';
+                postLogControls.style.display = 'flex';
+                // User Records now holds this transaction too, and marks it.
+                document.dispatchEvent(new CustomEvent('verify:transaction-logged',
+                    { detail: { transactionId: resp.transaction_id || '',
+                                transactionType: ttSearch.value } }));
+            } else {
+                docStatus.textContent = resp.message || 'Failed to log transaction.';
+                docStatus.className = 'error';
+                btnLog.textContent = 'Log Transaction';
+                btnLog.disabled = false;
+            }
+        })
+        .catch(function(err) {
+            // Not necessarily the network: this catches anything thrown while
+            // handling a perfectly good response too, and reporting that as a
+            // network error sent somebody looking at the wrong thing.
+            console.error('log-transaction failed:', err);
+            docStatus.textContent = 'Could not complete: '
+                + ((err && err.message) || 'network error') + '.';
+            docStatus.className = 'error';
+            btnLog.textContent = 'Log Transaction';
+            btnLog.disabled = false;
+        });
+    });
+
+    /* ---- fitting the certificate to the space the card leaves ---------
+       The card below the cut line is a fixed printed footprint and the flex
+       rules reserve its height. What is left over is what the certificate
+       gets, and `--fit` is how much it has had to give up to live there.
+
+       MEASURED, never assumed: a height worked out by arithmetic is wrong
+       on the next name length, so this asks the browser instead. The sheet
+       is the same 188 x 257 mm box on screen as on paper, which is why the
+       screen/print split inside `.doc-page` was collapsed: the layout being
+       read here IS the printed layout, and a number measured off it means
+       something.
+
+       Written as an INLINE style, which is not a detail: Save as PDF copies
+       `docPage.outerHTML` into a window that has no fitter, so the value has
+       to travel on the element. A stylesheet rule would not.
+
+       Stepping down rather than binary searching, because the predicate is
+       not cleanly monotonic -- a smaller type size can pull a wrapped value
+       back onto one line and briefly UNDO an overflow -- and 25 reflows of
+       one block is nothing next to being subtly wrong. */
+    var FIT_MIN = 0.5, FIT_STEP = 0.02;
+
+    function docOverflows(body) {
+        return body.scrollHeight > body.clientHeight + 1;
+    }
+
+    function fitPass(page, body) {
+        var fit = 1;
+        page.style.setProperty('--fit', '1');
+        while (fit > FIT_MIN && docOverflows(body)) {
+            fit = Math.max(FIT_MIN, fit - FIT_STEP);
+            page.style.setProperty('--fit', fit.toFixed(2));
+        }
+        return fit;
+    }
+
+    /* Two passes, and the second is a different LAYOUT rather than a smaller
+       one. Measured: the centred certificate holds to 22 displayed fields
+       and is 17.3 mm over at 36 with every floor bottomed out, so there is
+       nothing left to shrink -- but standing the portrait beside the name
+       instead of above it gives the sheet back more than that. Shrinking is
+       tried first because the centred form is the better document; the row
+       is what a 36-field organization gets rather than a clipped page. */
+    function fitDocument() {
+        var page = document.getElementById('doc-page');
+        var body = document.getElementById('doc-body');
+        if (!page || !body) { return 1; }
+        // Only in a browser that prints zoomed (see `--print-zoom`). Put back
+        // below, before anything paints or copies this element.
+        var printZoom = getComputedStyle(page).getPropertyValue('--print-zoom').trim();
+        if (printZoom) { page.style.zoom = printZoom; }
+        page.classList.remove('doc-tight');
+        var fit = fitPass(page, body);
+        if (docOverflows(body)) {
+            page.classList.add('doc-tight');
+            fit = fitPass(page, body);
+        }
+        /* Only reachable once BOTH layouts have bottomed out. Say so rather
+           than clip in silence -- a certificate quietly missing its last
+           rows is the failure worth being loud about. */
+        if (docOverflows(body)) {
+            console.warn('document: still overflows at --fit ' + fit.toFixed(2)
+                         + '; the sheet will be clipped rather than spill.');
+        }
+        if (printZoom) { page.style.zoom = ''; }
+        return fit;
+    }
+
+    /* The three things that change the sheet's height, and each has to
+       re-fit: the fonts arriving, the portrait arriving, and the card
+       appearing under the cut line once a transaction is logged. */
+    fitDocument();
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(fitDocument);
+    }
+    var heroFace = document.getElementById('doc-hero-face');
+    if (heroFace && !heroFace.complete) {
+        heroFace.addEventListener('load', fitDocument);
+        heroFace.addEventListener('error', fitDocument);
+    }
+
+    // --- Save as PDF ---
+    /* The Save-as-PDF window has its own document and inherits no styling
+       from this one, so it needs the print stylesheet. A hand-written copy
+       of it would be the same numbers typed twice, which is how two paths
+       out of one template end up disagreeing about the page box.
+
+       So the rules are READ OFF THIS PAGE instead. Non-print rules first,
+       then the print ones, which is the order the cascade already gives
+       them here and is what lets a print rule override its screen twin. */
+    function printStylesheet() {
+        var base = [], printed = [];
+        for (var i = 0; i < document.styleSheets.length; i++) {
+            var rules;
+            try { rules = document.styleSheets[i].cssRules; } catch (e) { continue; }
+            if (!rules) { continue; }
+            for (var j = 0; j < rules.length; j++) {
+                var rule = rules[j];
+                if (rule.media && /print/.test(rule.conditionText || '')) {
+                    for (var k = 0; k < rule.cssRules.length; k++) {
+                        printed.push(rule.cssRules[k].cssText);
+                    }
+                } else if (rule.media) {
+                    continue;   // a screen-only query has nothing to say here
+                } else {
+                    base.push(rule.cssText);
+                }
+            }
+        }
+        return base.concat(printed).join('\n');
+    }
+
+    document.getElementById('btn-save-pdf').addEventListener('click', function() {
+        // Last word before the copy is taken: the value has to be on the
+        // element, because the window it lands in has no fitter.
+        fitDocument();
+        var docPage = document.querySelector('.doc-page');
+        /* Safari prints this page correctly and the copy below badly: on
+           Letter its window cut the certificate short. Its print dialog saves
+           a PDF, so in Safari this button opens that, and one path is the
+           one measured. */
+        if (getComputedStyle(docPage).getPropertyValue('--print-zoom').trim()) {
+            window.print();
+            return;
+        }
+        // A canvas does not survive outerHTML, so each symbol becomes an
+        // <img> before the document is copied -- and is put back afterwards,
+        // or the page is left holding images the next print cannot resize.
+        var swapped = [];
+        ['#doc-validate-qr canvas', '#cut-canvas'].forEach(function (sel) {
+            var canvas = docPage.querySelector(sel);
+            if (!canvas) { return; }
+            var img = document.createElement('img');
+            img.src = canvas.toDataURL('image/png');
+            canvas.parentNode.replaceChild(img, canvas);
+            swapped.push([img, canvas]);
+        });
+
+        var win = window.open('', '_blank');
+        win.document.write('<html><head><title>' + document.title + '</title>');
+        win.document.write('<style>');
+        win.document.write(printStylesheet());
+        // This window has no print media of its own until it prints, and the
+        // rules just copied out of the print block have to apply on sight.
+        win.document.write('.doc-page { display: flex !important; }');
+        win.document.write('.cut-card { display: block !important; }');
+        // Without this the card prints at its pixel size, because the rule
+        // that sizes it names the canvas by id and the canvas is no longer
+        // there.
+        win.document.write('.cut-block > img { display: block;'
+                           + ' width: {{ card_print_h_mm }}mm;'
+                           + ' height: {{ card_print_w_mm }}mm; }');
+        win.document.write('</style></head><body>');
+        // Inside the same wrapper it has here. body is a centring flex column
+        // in this app's base stylesheet, so a .doc-page dropped straight into
+        // it shrinks to its content, the table wraps further, and the sheet
+        // that fitted on the Print path spilled on this one.
+        win.document.write('<div class="container">' + docPage.outerHTML + '</div>');
+        win.document.write('</bo' + 'dy></html>');
+        win.document.close();
+        setTimeout(function() { win.print(); }, 300);
+
+        swapped.forEach(function (pair) {
+            if (pair[0].parentNode) { pair[0].parentNode.replaceChild(pair[1], pair[0]); }
+        });
+    });
+
+    // --- Generate QR Code ---
+
+    /* Draw one symbol into a container. Shared, because two near-identical
+       copies of canvas plumbing is how one of them quietly stops matching the
+       other -- and these two must be drawn the same way or only one scans. */
+    /* qrcode-generator defaults addData to BYTE mode -- `mode = mode ||
+       'Byte'` in the library -- and nothing about an uppercase payload
+       changes that. Byte mode costs ~45% of the capacity, which put the
+       portrait symbol past what any QR can hold (it threw, and the fetch
+       handler reported it as a network error), and drew the credential at a
+       far higher version than the stamp was sized for -- below the 0.4 mm
+       floor, on paper, silently. Ask for the mode; never assume it. */
+    var ALNUM = /^[0-9A-Z $%*+\-.\/:]*$/;
+
+    function drawQR(container, payload, level) {
+        var qr = qrcode(0, level);
+        // Byte only if the payload genuinely cannot be alphanumeric, which
+        // for a credential or a portrait it never is.
+        qr.addData(payload, ALNUM.test(payload) ? 'Alphanumeric' : 'Byte');
+        qr.make();
+        var size = 340; // ~2x the printed module count, for sharpness
+        var canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        var ctx = canvas.getContext('2d');
+        var cells = qr.getModuleCount();
+        var cellSize = size / cells;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, size, size);
+        ctx.fillStyle = '#000';
+        for (var r = 0; r < cells; r++) {
+            for (var c = 0; c < cells; c++) {
+                if (qr.isDark(r, c)) {
+                    ctx.fillRect(c * cellSize, r * cellSize,
+                                 cellSize + 0.5, cellSize + 0.5);
+                }
+            }
+        }
+        container.innerHTML = '';
+        container.appendChild(canvas);
+        return canvas;
+    }
+
+    /* The validation symbol beside the seal.
+
+       The bare transaction id, UPPERCASED -- which is not cosmetic. The
+       alphanumeric charset has no lowercase, so a lowercase uuid falls back
+       to byte mode and costs about 45% of the capacity: version 4 and 33
+       modules instead of version 3 and 29. `/api/validate/` answers for
+       either spelling (pinned), and the Validate page's pattern is
+       case-insensitive, so the cheaper one is free.
+
+       Level Q like everything else this app prints: 25% recovery is what
+       tolerates a stamped, folded or partly smudged page, and at 29 modules
+       it costs four modules over level M. */
+    function generateValidateQR(transactionId) {
+        var container = document.getElementById('doc-validate-qr');
+        if (!container || !transactionId) { return; }
+        drawQR(container, String(transactionId).toUpperCase(), 'Q');
+    }
+
+    /* ---- the cut-out card ------------------------------------------
+       Drawn by `static/cardcanvas.js`, which is what draws it on the
+       holder's phone. The page passes the payload through untouched: which
+       fields are on it, whose organization it names and whether it is masked
+       were all decided on the server, where there is a session to decide
+       them with.
+
+       No card, no cut-out. `resp.card` comes back only with a minted
+       credential, and a card with nothing offline on it is not worth cutting
+       out.
+
+       The seal travels as this page's own <img> so the canvas stays
+       same-origin and untainted -- the Save-as-PDF path reads it back with
+       toDataURL(), which a tainted canvas refuses. */
+    function drawCutCard(card) {
+        var block = document.getElementById('cut-card');
+        var canvas = document.getElementById('cut-canvas');
+        if (!block || !canvas) { return; }
+        if (!card) {
+            block.classList.remove('ready');
+            return;
+        }
+        var seal = document.getElementById('doc-stamp');
+        // Upright, as on the phone, then its pixels turned into the printed
+        // block (see `#cut-canvas`). A quarter turn lands every pixel on a
+        // pixel, so with smoothing off the QR modules are unchanged.
+        var upright = document.createElement('canvas');
+        upright.width = {{ card_canvas_w_px }};
+        upright.height = {{ card_canvas_h_px }};
+        CardCanvas.render(card, upright, seal ? seal.src : '')
+            .then(function () {
+                var ctx = canvas.getContext('2d');
+                ctx.imageSmoothingEnabled = false;
+                ctx.setTransform(0, -1, 1, 0, 0, canvas.height);
+                ctx.drawImage(upright, 0, 0);
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                block.classList.add('ready');
+                // The card has just taken its share of the sheet, so what
+                // the certificate has to fit into has shrunk. Re-fit before
+                // either print path can be reached.
+                fitDocument();
+            })
+            .catch(function (err) {
+                // A document without its cut-out is still a valid document,
+                // and the symbol beside the seal still validates it. Losing
+                // the card must not read as losing the verification.
+                console.error('cut-out card failed to draw:', err);
+            });
+    }
+
+    /* --- The hand-off to the holder's own phone -----------------------
+       BYTE mode, and that is not an oversight: the payload is a URL, so it
+       carries "//" and lowercase, both outside the alphanumeric charset.
+       devices.html makes the same call for the same reason. Level M rather
+       than Q -- this is read off a lit screen from 20 cm away, not off a
+       folded page under field lighting, and the lower level keeps the
+       version low and the modules large at 46 px. */
+    var handoffToken = '';
+
+    function showHandoff(url, token) {
+        var container = document.getElementById('handoff-qr');
+        var wrapper = document.getElementById('handoff');
+        if (!container || !wrapper || !url) { return; }
+        drawQR(container, url, 'M');
+        wrapper.hidden = false;
+        handoffToken = token || '';
+    }
+
+    /* Released the moment the operator leaves the document. That is the
+       ORDINARY end of a hand-off; the TTL on the server is only the backstop
+       for a lid closed mid-transaction, and a link that outlives the page it
+       was shown on is a link nobody is watching.
+
+       `pagehide` rather than `unload`: it is the one that still fires on iOS
+       Safari and it works with the back/forward cache. sendBeacon because a
+       fetch started in a closing tab is not guaranteed to leave. */
+    window.addEventListener('pagehide', function () {
+        if (!handoffToken) { return; }
+        var url = '/card/' + handoffToken + '/release/';
+        if (navigator.sendBeacon) {
+            navigator.sendBeacon(url);
+        } else {
+            fetch(url, { method: 'POST', keepalive: true }).catch(function () {});
+        }
+    });
+
+    // --- Print ---
+    document.getElementById('btn-print').addEventListener('click', function() {
+        fitDocument();
+        window.print();
+    });
+})();
+</script>
+
+{% if current_org.check_user_records %}
+<script nonce="{{ csp_nonce }}">
+/* User Records. The server decides whose records these are and sends them
+   already worded; this only lists, searches and pages them. Every value is
+   set with textContent: these are other organizations' names and operators,
+   and none of it is this page's to trust as markup.
+
+   Search is by WORDS, each of which must appear in one of the four columns,
+   so "clinic 2026" finds a clinic's records from 2026. Paging copies the
+   Organization page's pager: 5, 15, 30 or All.
+
+   Repeats. The picker announces the type being logged, and records of that
+   type are marked: a dot for any organization's, a triangle and an amber row
+   for one the server says COUNTS AS A REPEAT -- logged here, inside this
+   organization's window, with the alert on. The line in the Transaction Type
+   bar says how many and when, and only informs: nothing here touches the Log
+   button. Types are compared by name, ignoring capitals and spacing, because
+   each organization keeps its own list and a name is all they share. The row
+   just logged is never a repeat of itself. */
+(function () {
+    var card = document.getElementById('user-records');
+    if (!card) { return; }
+    function el(id) { return document.getElementById(id); }
+    var body = el('ur-body'), toggle = el('ur-toggle'), count = el('ur-count');
+    var parts = {
+        loading: el('ur-loading'), empty: el('ur-empty'),
+        unavailable: el('ur-unavailable'), error: el('ur-error'), list: el('ur-list')
+    };
+    var rowsEl = el('ur-rows'), info = el('ur-info'), search = el('ur-search');
+    var sizeSel = el('ur-page-size'), prev = el('ur-prev'), next = el('ur-next');
+    var nomatch = el('ur-nomatch'), truncatedEl = el('ur-truncated');
+    var repeatEl = el('ur-repeat');
+
+    var records = [], filtered = [], page = 1, pageSize = 5, current = '';
+    // The type being logged; the server's window, or null with the alert
+    // off; and whether `records` is an answer at all yet.
+    var picked = '', repeatAlert = null, loaded = false, truncated = false;
+
+    toggle.addEventListener('click', function () {
+        var open = toggle.getAttribute('aria-expanded') !== 'true';
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        body.hidden = !open;
+    });
+
+    function show(which) {
+        for (var name in parts) { parts[name].hidden = name !== which; }
+    }
+
+    function setCount(n) {
+        count.textContent = n === 0 ? 'No records' : n + (n === 1 ? ' record' : ' records');
+        count.className = 'role-badge ur-count ' + (n === 0 ? 'role-operator' : 'role-admin');
+        count.hidden = false;
+    }
+
+    function cell(tr, text, cls) {
+        var td = document.createElement('td');
+        td.textContent = text;
+        if (cls) { td.className = cls; }
+        tr.appendChild(td);
+        return td;
+    }
+
+    function sameName(a, b) {
+        function norm(s) { return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase(); }
+        return norm(a) !== '' && norm(a) === norm(b);
+    }
+
+    // '' | 'same' | 'again'. The server decided whether a row counts as a
+    // repeat; this adds only whether its type is the one being logged.
+    function markOf(r) {
+        if (r.current || !sameName(r.transaction_type, picked)) { return ''; }
+        return r.counts_as_repeat ? 'again' : 'same';
+    }
+
+    function symbol(cls, text, label) {
+        var span = document.createElement('span');
+        span.className = cls;
+        span.setAttribute('role', 'img');
+        span.setAttribute('aria-label', label);
+        span.title = label;
+        span.textContent = text;
+        return span;
+    }
+
+    function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+
+    // The line beside Log Transaction. Hidden until there is an answer to
+    // give: no type picked, the alert off, or the records not (yet) loaded.
+    function updateRepeat() {
+        if (!repeatEl) { return; }
+        repeatEl.textContent = '';
+        repeatEl.className = 'ur-repeat';
+        if (!loaded || !repeatAlert || !picked) { repeatEl.hidden = true; return; }
+
+        var matches = records.filter(function (r) { return markOf(r) !== ''; });
+        var again = matches.filter(function (r) { return markOf(r) === 'again'; });
+        var days = repeatAlert.days;
+        var within = days > 0 ? ' in the last ' + (days === 1 ? 'day' : days + ' days') : '';
+        function earlier(n) {
+            return plural(n, 'earlier ' + picked + ' transaction', 'earlier ' + picked + ' transactions');
+        }
+        function line(cls, icon, headline, rest, target) {
+            repeatEl.className = 'ur-repeat ' + cls;
+            if (icon) {
+                var i = document.createElement('span');
+                i.className = 'ur-repeat-icon';
+                i.setAttribute('aria-hidden', 'true');
+                i.textContent = icon;
+                repeatEl.appendChild(i);
+            }
+            var text = document.createElement('span');
+            text.className = 'ur-repeat-text';
+            var b = document.createElement('b');
+            b.textContent = headline;
+            text.appendChild(b);
+            // `rest` is a list: plain strings, and [string] for a piece that
+            // must not break across lines, such as a timestamp.
+            (rest || []).forEach(function (part) {
+                text.appendChild(document.createTextNode(' '));
+                if (typeof part === 'string') {
+                    text.appendChild(document.createTextNode(part));
+                } else {
+                    var keep = document.createElement('span');
+                    keep.className = 'ur-nowrap';
+                    keep.textContent = part[0];
+                    text.appendChild(keep);
+                }
+            });
+            repeatEl.appendChild(text);
+            if (target) {
+                var link = document.createElement('button');
+                link.type = 'button';
+                link.className = 'ur-repeat-link';
+                link.textContent = 'See in User Records';
+                link.addEventListener('click', function () { reveal(target); });
+                repeatEl.appendChild(link);
+            }
+        }
+
+        if (again.length) {
+            var latest = again[0];
+            var rest = ['Latest:'];
+            if (latest.operator && latest.operator !== '—') {
+                rest.push([latest.when + ','], 'by ' + latest.operator + '.');
+            } else {
+                rest.push([latest.when + '.']);
+            }
+            line('ur-repeat-warn', '⚠',
+                 earlier(again.length) + ' at this organization' + within + '.',
+                 rest, latest);
+        } else if (matches.length) {
+            line('ur-repeat-info', '',
+                 earlier(matches.length) + ', ' + (matches.length === 1 ? 'not' : 'none')
+                     + ' at this organization' + within + '.',
+                 null, matches[0]);
+        } else {
+            line('ur-repeat-none', '',
+                 'No earlier ' + picked + ' transactions for this National ID'
+                     + (truncated ? ' in the newest ' + records.length + ' records.' : ', in any organization.'),
+                 null, null);
+        }
+        repeatEl.hidden = false;
+    }
+
+    // "See in User Records": open the card, page to the row, flash it. The
+    // search is cleared only when it hides the row.
+    function reveal(r) {
+        toggle.setAttribute('aria-expanded', 'true');
+        body.hidden = false;
+        if (filtered.indexOf(r) < 0) { search.value = ''; applySearch(); }
+        var i = filtered.indexOf(r);
+        if (i < 0) { return; }
+        page = pageSize === 0 ? 1 : Math.floor(i / pageSize) + 1;
+        render();
+        var tr = rowsEl.querySelector('tr[data-ur="' + r.idx + '"]');
+        if (!tr) { return; }
+        tr.classList.add('ur-flash');
+        var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        tr.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
+    }
+
+    function render() {
+        var total = filtered.length;
+        var showAll = pageSize === 0;
+        var pages = showAll ? 1 : Math.max(1, Math.ceil(total / pageSize));
+        if (page > pages) { page = pages; }
+        var start = showAll ? 0 : (page - 1) * pageSize;
+        var end = showAll ? total : Math.min(start + pageSize, total);
+        rowsEl.textContent = '';
+        for (var i = start; i < end; i++) {
+            var r = filtered[i];
+            var mark = markOf(r);
+            var tr = document.createElement('tr');
+            tr.setAttribute('data-ur', String(r.idx));
+            var mk = cell(tr, '', 'ur-mk');
+            if (mark === 'again') {
+                mk.appendChild(symbol('ur-warn', '⚠', 'Same type, logged here before'));
+            } else if (mark === 'same') {
+                mk.appendChild(symbol('ur-dot', '', 'Same transaction type'));
+            }
+            var when = cell(tr, r.when, 'ur-when');
+            if (r.current) {
+                tr.className = 'ur-current';
+                var tag = document.createElement('span');
+                tag.className = 'ur-tag';
+                tag.textContent = 'This transaction';
+                when.appendChild(tag);
+            } else if (mark) {
+                tr.className = 'ur-' + mark;
+            }
+            cell(tr, r.organization, 'ur-org');
+            cell(tr, r.transaction_type, 'ur-type');
+            cell(tr, r.operator, '');
+            rowsEl.appendChild(tr);
+        }
+        info.textContent = total === 0 ? 'No records'
+            : 'Showing ' + (start + 1) + '-' + end + ' of ' + total;
+        prev.disabled = page <= 1;
+        next.disabled = page >= pages;
+        nomatch.hidden = total !== 0;
+        nomatch.textContent = total === 0
+            ? 'No records match “' + search.value.trim() + '”.' : '';
+    }
+
+    function applySearch() {
+        var words = search.value.toLowerCase().split(/\s+/).filter(Boolean);
+        filtered = records.filter(function (r) {
+            return words.every(function (w) { return r.text.indexOf(w) !== -1; });
+        });
+        page = 1;
+        render();
+    }
+
+    function load() {
+        show('loading');
+        loaded = false;
+        updateRepeat();
+        var url = '/app/user-records/' + (current ? '?current=' + encodeURIComponent(current) : '');
+        fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function (r) {
+                if (!r.ok) { throw new Error('HTTP ' + r.status); }
+                return r.json();
+            })
+            .then(function (d) {
+                if (!d.available) { count.hidden = true; show('unavailable'); return; }
+                records = (d.records || []).map(function (r, i) {
+                    r.idx = i;
+                    r.text = [r.when, r.organization, r.transaction_type, r.operator]
+                        .join(' ').toLowerCase();
+                    return r;
+                });
+                repeatAlert = d.repeat_alert || null;
+                truncated = !!d.truncated;
+                loaded = true;
+                updateRepeat();
+                setCount(records.length);
+                if (!records.length) { show('empty'); return; }
+                el('ur-stat-records').textContent = records.length;
+                el('ur-stat-orgs').textContent = d.organizations;
+                el('ur-stat-when').textContent = records[0].when;
+                el('ur-stat-org').textContent = records[0].organization;
+                truncatedEl.hidden = !d.truncated;
+                truncatedEl.textContent = d.truncated
+                    ? 'Only the newest ' + d.limit + ' are listed.' : '';
+                show('list');
+                applySearch();   // keeps what the operator typed across a refresh
+            })
+            .catch(function (err) {
+                console.error('user-records failed:', err);
+                count.hidden = true;
+                show('error');
+            });
+    }
+
+    search.addEventListener('input', applySearch);
+    sizeSel.addEventListener('change', function () {
+        pageSize = this.value === 'all' ? 0 : parseInt(this.value, 10);
+        page = 1;
+        render();
+    });
+    prev.addEventListener('click', function () { page--; render(); });
+    next.addEventListener('click', function () { page++; render(); });
+    el('ur-retry').addEventListener('click', load);
+    document.addEventListener('verify:transaction-type', function (e) {
+        picked = (e.detail && e.detail.name) || '';
+        render();
+        updateRepeat();
+    });
+    document.addEventListener('verify:transaction-logged', function (e) {
+        current = (e.detail && e.detail.transactionId) || '';
+        picked = (e.detail && e.detail.transactionType) || picked;
+        // The pre-log bar is hidden from here on; the line goes with the
+        // controls that are left, so it is still read beside Print.
+        var postLog = el('post-log-controls');
+        if (repeatEl && postLog) { postLog.appendChild(repeatEl); }
+        load();
+    });
+    load();
+})();
+</script>
+{% endif %}
+{% endblock %}

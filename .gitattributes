@@ -1,0 +1,31 @@
+# Shell scripts run under sh/bash, which reads a carriage return as part of
+# the command. Keep them LF on every checkout, Windows included -- a CRLF
+# pre-push hook errors on every push, and a guard that blocks everything is
+# a guard somebody switches off.
+*.sh           text eol=lf
+tools/hooks/*  text eol=lf
+
+# Rendered into a Linux server's boot script, or compared with what is
+# installed there by `deploy.sh check`. A carriage return would reach
+# systemd and nginx, and read as drift on every server.
+*.tf                     text eol=lf
+*.tftpl                  text eol=lf
+deploy/gunicorn.conf.py  text eol=lf
+deploy/site.conf.example text eol=lf
+
+# Installed onto a Linux host by signer/deploy/install.sh: systemd units, a
+# drop-in and the policy file. A carriage return would reach systemd.
+signer/deploy/*          text eol=lf
+
+# `git archive` writes the commit into it, so a signer installed from an
+# archive can say which one it runs (install.sh, signer/version.py).
+signer/COMMIT            export-subst text eol=lf
+
+# Pinned SSH host keys (a site's known_hosts, beside its site.conf). ssh
+# would read a carriage return as part of the key, and refuse the host on
+# every deploy.
+known_hosts              text eol=lf
+
+# An nginx configuration a deploy puts in place, or a first-boot script
+# embeds. A carriage return would reach nginx.
+*.nginx.conf             text eol=lf

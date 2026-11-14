@@ -1,0 +1,15 @@
+django>=5.2,<5.3
+gunicorn>=23.0,<24.0
+requests>=2.32,<3.0
+opencv-python-headless>=4.10,<5.0
+numpy>=2.0,<3.0
+# For the AVIF encoder alone (accounts/portrait_avif.py): the opencv wheels
+# carry none. 11.2 is the first with libavif in its wheels.
+Pillow>=11.2,<13
+
+# The first crypto dependency in this stack. Required by ovcrypto/, which is a
+# verbatim copy of the module of the same name in the sibling OfflineVerifier
+# project -- it signs and encrypts the offline credential carried in a
+# verification document's QR. Keep the range in step with that project, or the
+# two implementations can drift apart on a version that changes an encoding.
+cryptography>=44,<51

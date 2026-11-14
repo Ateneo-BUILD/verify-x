@@ -1,0 +1,94 @@
+# nginx in front of gunicorn, behind a load balancer that terminates TLS.
+#
+# A template: terraform/main.tf renders it into the server's boot script,
+# which installs it as /etc/nginx/conf.d/verify.conf, and `deploy/deploy.sh
+# --check` compares the installed copy with it. The one placeholder is the
+# application directory. To use it without Terraform, substitute that by
+# hand. Django admin's password login is limited per client address here,
+# and again in the application with the other paths anybody can reach
+# (accounts/throttle.py). The others are limited only there, because only
+# there is a signed-in operator told apart: nginx cannot see a session. The
+# address is the last entry of the X-Forwarded-For the load balancer sends,
+# the one it appended, never one the client wrote; it is read only for the
+# login path. The pattern is anchored: unanchored, a long header costs time
+# quadratic in its length.
+map $uri $verify_admin_login {
+    "/admin/login/"  1;
+    default          0;
+}
+map $http_x_forwarded_for $verify_client {
+    "~^(?:.*,)?\s*(?<last>[^,\s]+)\s*$"  $last;
+    default                              $remote_addr;
+}
+map $verify_admin_login $verify_limit_key {
+    1        $verify_client;
+    default  "";
+}
+limit_req_zone $verify_limit_key zone=verify_admin_login:10m rate=10r/m;
+
+server {
+    listen 80;
+    server_name _;
+
+    # Compress what goes out. One verification's six responses are 214 KB as
+    # sent and 66 KB compressed, and once a site is busy, data out is the
+    # largest line on its bill -- more than the servers. `gzip_proxied any`
+    # because every request arrives through the load balancer. HTML is always
+    # in gzip_types. Compressing pages that carry the CSRF token is safe
+    # because Django masks the token afresh in every response (BREACH).
+    gzip on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_proxied any;
+    gzip_vary on;
+    gzip_types text/css text/plain application/javascript application/json image/svg+xml;
+
+    location /static/ {
+        alias ${app_dir}/verify/staticfiles/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        # Django admin's login, per client address: a few tries, then one
+        # every six seconds. Every other path has an empty key, not counted.
+        limit_req zone=verify_admin_login burst=10 nodelay;
+        limit_req_status 429;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # Pass the load balancer's value through; do NOT substitute $scheme.
+        # TLS terminates at the load balancer and this nginx listens on plain
+        # :80, so $scheme is always "http" -- which overwrites a genuine
+        # "X-Forwarded-Proto: https" with "http", makes Django's
+        # SECURE_PROXY_SSL_HEADER never match, leaves request.is_secure()
+        # permanently False, and makes build_absolute_uri() return http://
+        # for every user. That is what put http:// into the device pairing QR,
+        # which the phone refuses outright. It also makes HSTS structurally
+        # unreachable.
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+        proxy_redirect off;
+        proxy_connect_timeout 60s;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
+    }
+
+    # The signer's report is for its reconciler on this host, which calls
+    # gunicorn directly; nothing from outside reaches it.
+    location /api/v1/signer/ {
+        return 404;
+    }
+
+    location /health/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        access_log off;
+    }
+
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+}

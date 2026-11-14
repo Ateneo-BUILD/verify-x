@@ -1,0 +1,68 @@
+# The credential signer. Its own user, root-owned code in
+# /opt/cl03-signer, keys and database in /var/lib/cl03-signer, two UNIX
+# sockets in /run/cl03-signer, no TCP port.
+[Unit]
+Description=OfflineVerifier credential signer
+After=network-online.target
+Before=gunicorn.service
+
+[Service]
+Type=simple
+User=cl03-signer
+Group=cl03-signer
+# The groups its two sockets belong to: a process may only give a file to a
+# group it is in.
+SupplementaryGroups=cl03-signer-app cl03-operators
+ExecStart=/opt/cl03-signer/venv/bin/python -m signer serve --config /etc/cl03-signer/policy.toml
+WorkingDirectory=/opt/cl03-signer
+RuntimeDirectory=cl03-signer
+# 0755: the app user (in cl03-signer-app) and cl03-operators must reach their
+# sockets inside. Each
+# socket is 0660 to its own group, and SO_PEERCRED names the caller, so
+# entering the directory grants nothing else.
+RuntimeDirectoryMode=0755
+StateDirectory=cl03-signer
+StateDirectoryMode=0700
+# AWS for the ledger and alerts, never the instance role (the app user can
+# reach IMDS). Files in /etc/cl03-signer/credstore, root-only.
+LoadCredential=aws-access-key-id:/etc/cl03-signer/credstore/aws-access-key-id
+LoadCredential=aws-secret-access-key:/etc/cl03-signer/credstore/aws-secret-access-key
+Restart=on-failure
+RestartSec=5
+# 2 is a rollback refusal and 3 a configuration that will not load
+# (`serve`, signer/startup.py): both deliberate and alerted once;
+# restarting would only repeat the alert every five seconds. Anything
+# else -- S3 or DNS not up yet at boot -- is retried.
+# Recovery: README.md, "When it will not start".
+RestartPreventExitStatus=2 3
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryDenyWriteExecute=yes
+LockPersonality=yes
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+SystemCallArchitectures=native
+# No capability at all: it runs as its own user, and gives its sockets to
+# groups it is in, which needs none (`systemd-analyze security`).
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateDevices=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+UMask=0077
+ReadWritePaths=/var/lib/cl03-signer /run/cl03-signer
+
+[Install]
+WantedBy=multi-user.target

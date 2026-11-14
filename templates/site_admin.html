@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ site_title }}: Site Administration{% endblock %}
+
+{% block extra_head %}
+<style>
+    .stats-grid { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .stat-card {
+        flex: 1; background: var(--card-background);
+        border: 1px solid var(--border-color); border-radius: 6px;
+        padding: 0.4rem 0.5rem; text-align: center;
+    }
+    .stat-card .stat-value { font-size: 1.2rem; font-weight: 700; color: var(--primary-color); line-height: 1.2; }
+    .stat-card .stat-label { font-size: 0.65rem; color: #666; text-transform: uppercase; letter-spacing: 0.03em; }
+
+    .org-table { width: 100%; border-collapse: collapse; }
+    .org-table th, .org-table td {
+        border: 1px solid var(--border-color);
+        padding: 0.4rem 0.5rem; text-align: left; font-size: 0.8rem;
+        vertical-align: middle;
+    }
+    .org-table th {
+        background-color: #f8f9fa; font-weight: 600; color: var(--secondary-color);
+        text-transform: uppercase; letter-spacing: 0.03em;
+    }
+    .org-table tr:hover { background-color: #f8f9fa; }
+    .org-cell { display: flex; align-items: center; gap: 0.5rem; }
+    .org-cell .org-mark { width: 28px; height: 28px; font-size: 0.62rem; border-radius: 5px; }
+    .org-cell img { max-height: 28px; max-width: 70px; width: auto; border-radius: 4px; }
+
+    .switch { position: relative; display: inline-block; width: 46px; height: 26px; cursor: pointer; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .slider {
+        position: absolute; inset: 0; background-color: #c3ccd4;
+        border-radius: 26px; cursor: pointer; transition: background-color 0.2s;
+    }
+    .switch .slider::before {
+        content: ""; position: absolute; height: 20px; width: 20px;
+        left: 3px; top: 3px; background-color: #fff; border-radius: 50%;
+        transition: transform 0.2s;
+    }
+    .switch input:checked + .slider { background-color: var(--primary-color); }
+    .switch input:checked + .slider::before { transform: translateX(20px); }
+    .switch input:focus-visible + .slider { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+
+    .card-head {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 1rem; flex-wrap: wrap; margin-bottom: 0.9rem;
+    }
+    .card-head h2 { margin: 0; }
+    .container a.btn-add {
+        display: inline-flex; width: auto; padding: 0.5rem 1rem;
+        font-size: 0.85rem; margin-top: 0; white-space: nowrap;
+    }
+    .row-actions { display: flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+    .container a.btn-manage {
+        display: inline-flex; width: auto; padding: 0.25rem 0.6rem;
+        font-size: 0.75rem; margin-top: 0;
+    }
+    .container button.btn-delete-org {
+        width: auto; margin-top: 0; padding: 0.25rem 0.6rem; font-size: 0.75rem;
+        background: #fff; color: #dc3545; border: 1px solid #dc3545;
+    }
+    .container button.btn-delete-org:hover { background: #fdecea; }
+    /* An organization with history cannot be deleted. The row says so rather
+       than offering a button the server would only refuse. */
+    .no-delete {
+        font-size: 0.75rem; color: #aab4be; padding: 0.25rem 0.2rem;
+        cursor: help; border-bottom: 1px dotted #c3ccd4;
+    }
+    #site-status {
+        margin-bottom: 1rem; padding: 0.65rem 0.85rem; border-radius: 4px;
+        font-size: 0.85rem; display: none;
+    }
+    #site-status.success { display: block; background: #e9f7ec; color: #28a745; border: 1px solid #28a745; }
+    #site-status.error { display: block; background: #fdecea; color: #dc3545; border: 1px solid #dc3545; }
+
+    /* The Export Log card's controls, from the organization admin page. */
+    .container button.btn-add {
+        width: auto; padding: 0.5rem 1rem; font-size: 0.85rem;
+        margin-top: 0; white-space: nowrap; align-self: flex-end;
+    }
+    .stat-card .stat-value.stat-when { font-size: 0.9rem; line-height: 1.6; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container">
+    {% csrf_token %}
+    {% include "includes/app_nav.html" with active_nav="site" %}
+
+    {% comment %}
+    No organization banner here on purpose: a site admin on this page is not
+    acting on behalf of any one organization, and a logo would say otherwise.
+    {% endcomment %}
+    <div class="page-title">Site Administration</div>
+    <div class="page-subtitle">Every organization on this site.</div>
+
+    <div id="site-status"></div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">{{ total_organizations }}</div>
+            <div class="stat-label">Organizations</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ active_organizations }}</div>
+            <div class="stat-label">Enabled</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ total_people }}</div>
+            <div class="stat-label">People</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ total_verifications }}</div>
+            <div class="stat-label">Verifications</div>
+        </div>
+    </div>
+
+    {# Organizations on the left, the phones' log beside them on a wide window. #}
+    <div class="page-cols">
+    <div class="page-main">
+    <div class="card">
+        <div class="card-head">
+            <h2>Organizations</h2>
+            {% comment %}
+            A link to the form, not a create. Nothing exists until that form is
+            submitted -- see site_new_organization().
+            {% endcomment %}
+            <a class="btn btn-add" href="{% url 'site_new_org' %}">Create organization</a>
+        </div>
+
+        <div style="overflow-x:auto;">
+        <table class="org-table">
+            <tr>
+                <th style="width:40%;">Organization</th>
+                <th>People</th>
+                <th>Locations</th>
+                <th>Types</th>
+                <th>eVerify</th>
+                <th>Enabled</th>
+                <th></th>
+            </tr>
+            {% for row in rows %}
+            <tr>
+                <td>
+                    <span class="org-cell">
+                        {% if row.org.logo_data %}
+                            <img src="{{ row.org.logo_data }}" alt="">
+                        {% else %}
+                            <span class="org-mark" style="background:{{ row.org.mark_color }};">{{ row.org.initials }}</span>
+                        {% endif %}
+                        {{ row.org.name }}
+                    </span>
+                </td>
+                <td>{{ row.people }}</td>
+                <td>{{ row.locations }}</td>
+                <td>{{ row.types }}</td>
+                <td>
+                    {% if row.org.everify_configured %}
+                        <span class="role-badge role-ok">Configured</span>
+                    {% else %}
+                        <span class="role-badge role-none">No credentials</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <label class="switch">
+                        <input type="checkbox" class="org-toggle" data-org="{{ row.org.id }}"
+                               data-name="{{ row.org.name }}"
+                               {% if row.org.is_active %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </td>
+                <td>
+                    <span class="row-actions">
+                        <a class="btn btn-manage" href="{% url 'site_organization' row.org.id %}">Manage</a>
+                        {% if row.deletable %}
+                        <button type="button" class="btn-delete-org"
+                                data-org="{{ row.org.id }}" data-name="{{ row.org.name }}">Delete</button>
+                        {% else %}
+                        <span class="no-delete"
+                              title="{{ row.transactions }} transaction{{ row.transactions|pluralize }}, {{ row.credentials }} issued credential{{ row.credentials|pluralize }} and {{ row.log_entries }} phone log record{{ row.log_entries|pluralize }} on record. Deleting would leave those belonging to no organization; disable it instead.">Delete</span>
+                        {% endif %}
+                    </span>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" style="text-align:center; color:#999; padding:1rem;">
+                No organizations yet. Create the first one with the button above.
+            </td></tr>
+            {% endfor %}
+        </table>
+        </div>
+
+        <div class="hint">
+            A disabled organization keeps its people, locations and transactions.
+            It stops appearing at sign-in, and any session already inside it ends
+            on the next request. Deleting is for an organization that should not
+            exist at all: it takes that organization's people list, locations,
+            transaction types, field settings and phones' links to it with it, and
+            is refused outright once anything has been verified or logged under it
+            &mdash; disable those instead.
+        </div>
+    </div>
+    </div>{# /.page-main #}
+
+    <div class="page-side">
+    {% comment %}
+    The phones' activity log, WHOLE. Here and on no organization's page: a
+    phone belongs to a person, and a person may belong to several
+    organizations, so an organization's admin would be shown what a phone did
+    for another. An organization's page exports only the records filed under
+    it (ORGANIZATION below).
+    {% endcomment %}
+    <div class="card" id="device-logs">
+        <div class="card-head">
+            <h2>Device logs</h2>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">{{ device_log.entries }}</div>
+                <div class="stat-label">Entries stored</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ device_log.phones }}</div>
+                <div class="stat-label">Phones that have sent a log</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value stat-when">{% if device_log.last_received %}{{ device_log.last_received|date:"m/d/Y h:i A" }}{% else %}Never{% endif %}</div>
+                <div class="stat-label">Last received</div>
+            </div>
+        </div>
+
+        <form id="device-log-export-form" action="{% url 'site_export_device_logs' %}" method="get" target="_blank">
+            <div style="display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap;">
+                <div class="form-group" style="flex:1; min-width:140px; margin-bottom:0;">
+                    <label for="device-log-start" style="font-size:0.75rem;">Start Date</label>
+                    <input type="date" id="device-log-start" name="start"
+                           style="width:100%; padding:0.4rem 0.5rem; font-size:0.85rem; border:1.5px solid #999; border-radius:4px;">
+                </div>
+                <div class="form-group" style="flex:1; min-width:140px; margin-bottom:0;">
+                    <label for="device-log-end" style="font-size:0.75rem;">End Date</label>
+                    <input type="date" id="device-log-end" name="end"
+                           style="width:100%; padding:0.4rem 0.5rem; font-size:0.85rem; border:1.5px solid #999; border-radius:4px;">
+                </div>
+                <button type="submit" class="btn-add" id="btn-device-log-export">
+                    Export device logs (CSV)
+                </button>
+            </div>
+        </form>
+
+        <div class="hint">
+            What every paired phone recorded and sent: one row per record, in
+            each phone&rsquo;s own order. Give both dates, or neither for
+            everything held. Dates are the phone&rsquo;s own clock, in GMT+8;
+            the time it arrived here is a column beside it. CHAIN reads
+            &ldquo;break&rdquo; where a record did not follow the one before
+            it, and READABLE &ldquo;no&rdquo; where it could not be opened.
+            ORGANIZATION is the one the phone was working for; &ldquo;(not
+            linked)&rdquo; marks a record naming one the phone was never
+            linked to.
+        </div>
+    </div>
+    </div>{# /.page-side #}
+    </div>{# /.page-cols #}
+
+    {% include "includes/branding_footer.html" %}
+</div>
+
+<script nonce="{{ csp_nonce }}">
+(function() {
+    var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    var statusEl = document.getElementById('site-status');
+
+    function showStatus(msg, isError) {
+        statusEl.textContent = msg;
+        statusEl.className = isError ? 'error' : 'success';
+        if (!isError) {
+            setTimeout(function() { statusEl.className = ''; }, 4000);
+        }
+    }
+
+    document.querySelectorAll('.btn-delete-org').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var button = this;
+            var name = button.dataset.name;
+            // Deliberately one flat concatenation with no escape sequences:
+            // an escape written here has to survive the template file, and one
+            // that arrives unescaped is a syntax error that kills every
+            // handler in this block rather than just this one.
+            var warning = 'Delete ' + name + '?'
+                        + ' Its people list, locations, transaction types,'
+                        + ' eVerify field settings and phones\u2019 links to it'
+                        + ' go with it, and none of that can be undone.'
+                        + ' Nobody\u2019s account is deleted, and their other'
+                        + ' organizations are untouched.'
+                        + ' To keep it and only stop sign-in, disable it instead.';
+            if (!confirm(warning)) { return; }
+            button.disabled = true;
+            fetch('/app/site/organizations/' + button.dataset.org + '/delete/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: '{}'
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                if (resp.status === 'ok') {
+                    showStatus(resp.message, false);
+                    setTimeout(function() { location.reload(); }, 600);
+                } else {
+                    button.disabled = false;
+                    showStatus(resp.message, true);
+                }
+            })
+            .catch(function() { button.disabled = false; showStatus('Network error.', true); });
+        });
+    });
+
+    document.querySelectorAll('.org-toggle').forEach(function(toggle) {
+        toggle.addEventListener('change', function() {
+            var box = this;
+            var wanted = box.checked;
+            // Turning one off ends every session inside it at the next
+            // request, so it asks first. Turning one back on takes nothing
+            // from anybody.
+            if (!wanted && !confirm('Disable ' + box.dataset.name + '?'
+                    + ' Everyone signed into it is signed out of it at their'
+                    + ' next step, and nobody can choose it until it is'
+                    + ' enabled again. Nothing is deleted.')) {
+                box.checked = true;
+                return;
+            }
+            fetch('/app/site/organizations/' + box.dataset.org + '/toggle/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ is_active: wanted })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                if (resp.status === 'ok') {
+                    showStatus(resp.message, false);
+                } else {
+                    box.checked = !wanted;
+                    showStatus(resp.message, true);
+                }
+            })
+            .catch(function() { box.checked = !wanted; showStatus('Network error.', true); });
+        });
+    });
+
+    // --- Device log export: both dates, or neither ---
+    // Half a range is the one thing refused. Neither date exports everything
+    // held, which on an audit trail is an ordinary request rather than an
+    // accident -- the organization Export Log requires both instead.
+    var logStart = document.getElementById('device-log-start');
+    var logEnd = document.getElementById('device-log-end');
+    var btnLogExport = document.getElementById('btn-device-log-export');
+    function updateLogExportBtn() {
+        btnLogExport.disabled = Boolean(logStart.value) !== Boolean(logEnd.value);
+    }
+    ['change', 'input'].forEach(function(name) {
+        logStart.addEventListener(name, updateLogExportBtn);
+        logEnd.addEventListener(name, updateLogExportBtn);
+    });
+    updateLogExportBtn();
+})();
+</script>
+{% endblock %}

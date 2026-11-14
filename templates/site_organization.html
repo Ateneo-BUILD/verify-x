@@ -1,0 +1,1119 @@
+{% extends "base.html" %}
+{% load static %}
+{% load demo %}
+
+{% block title %}{{ site_title }}: {% if is_new %}New organization{% else %}{{ org.name }}{% endif %}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .setup-section { border-top: 1px solid var(--border-color); margin-top: 1.5rem; padding-top: 1.25rem; }
+    .setup-section--first { border-top: none; margin-top: 0; padding-top: 0; }
+    .setup-section h3 { font-size: 0.95rem; color: var(--secondary-color); margin: 0 0 0.85rem; }
+    .container button.btn-save { width: auto; padding: 0.65rem 1.5rem; margin-top: 0.5rem; }
+
+    /* The organization's name, its state, and the one switch that changes
+       it -- a status row, not a section. The switch is a form field and sits
+       INSIDE the form; an input reaching it through a form= attribute would
+       post nothing on a browser that did not honour that, and absence is how
+       an unchecked checkbox spells "disabled". */
+    .org-titlerow {
+        display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+        padding-bottom: 0.65rem; margin-bottom: 0.9rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .org-titlerow .org-mark { width: 34px; height: 34px; font-size: 0.78rem; border-radius: 7px; }
+    .org-title-logo { max-height: 34px; max-width: 90px; width: auto; border-radius: 5px; }
+    .org-title-name { font-size: 1.05rem; font-weight: 700; color: var(--secondary-color); }
+    .org-enabled {
+        margin-left: auto; display: flex; align-items: center; gap: 0.5rem;
+        font-size: 0.8rem; font-weight: 600; color: #55606b; cursor: pointer;
+    }
+    .org-enabled-hint { margin-top: -0.5rem; margin-bottom: 1rem; }
+
+    /* Short fields share a row, so nine of them cost four rows rather than
+       nine. One column on a narrow screen, where side by side is unreadable. */
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+    .grid3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 0 1rem; }
+    @media (max-width: 640px) {
+        .grid2, .grid3 { grid-template-columns: 1fr; }
+    }
+    /* The cards in two columns on a wide window. Placed by name, so the
+       markup keeps the order a narrow window reads. Row 2 is the flexible
+       one: the form spans rows 1 and 2, so whatever height it has beyond
+       People goes into row 2, and Lists sits directly under People
+       instead of wherever the form happens to end. */
+    @media screen and (min-width: 1100px) {
+        .org-cols {
+            display: grid;
+            grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+            grid-template-rows: auto 1fr auto;
+            column-gap: 1.25rem;
+            align-items: start;
+        }
+        .org-cols > .org-cols-form { grid-column: 1; grid-row: 1 / span 2; }
+        .org-cols > .org-cols-people { grid-column: 2; grid-row: 1; }
+        .org-cols > .org-cols-lists { grid-column: 2; grid-row: 2; }
+        .org-cols > .org-cols-fields { grid-column: 1 / -1; grid-row: 3; }
+    }
+    .id-row { display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap; }
+    .id-fields { flex: 1; min-width: 240px; }
+
+    .toggle-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+    .toggle-row .toggle-label { font-weight: 600; }
+    .switch { position: relative; display: inline-block; flex: 0 0 auto; width: 46px; height: 26px; cursor: pointer; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .slider {
+        position: absolute; inset: 0; background-color: #c3ccd4;
+        border-radius: 26px; cursor: pointer; transition: background-color 0.2s;
+    }
+    .switch .slider::before {
+        content: ""; position: absolute; height: 20px; width: 20px;
+        left: 3px; top: 3px; background-color: #fff; border-radius: 50%;
+        transition: transform 0.2s;
+    }
+    .switch input:checked + .slider { background-color: var(--primary-color); }
+    .switch input:checked + .slider::before { transform: translateX(20px); }
+    .switch input:focus-visible + .slider { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+
+    /* eVerify fields: one ordered list, with a live view of what comes out.
+       The list is long -- 36 keys -- so it scrolls inside the card and the
+       preview stays put beside it. */
+    .fields-split { display: flex; gap: 1rem; align-items: flex-start; }
+    .fields-split .fl-list-col { flex: 1 1 60%; min-width: 0; }
+    .fields-split .fl-preview-col { flex: 0 0 36%; min-width: 0; position: sticky; top: 0.5rem; }
+    @media (max-width: 820px) {
+        .fields-split { flex-direction: column; }
+        .fields-split .fl-preview-col { position: static; width: 100%; flex-basis: auto; }
+    }
+
+    .fl-list {
+        list-style: none; padding: 0; margin: 0;
+        max-height: 27rem; overflow-y: auto;
+        border: 1px solid var(--border-color); border-radius: 4px;
+        padding: 0.4rem; background: #fbfcfd;
+    }
+    .fl-group {
+        display: flex; align-items: center; gap: 0.6rem;
+        font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em;
+        text-transform: uppercase; color: #8b98a5; margin: 0.75rem 0 0.35rem;
+    }
+    .fl-group:first-child { margin-top: 0.1rem; }
+    .fl-group::after { content: ""; flex: 1; height: 1px; background: var(--border-color); }
+    .fl-group .fl-count { font-weight: 600; letter-spacing: 0; text-transform: none; color: #aab4be; }
+
+    .fl-row {
+        display: flex; align-items: center; gap: 0.4rem;
+        border: 1px solid var(--border-color); border-radius: 4px; background: #fff;
+        padding: 0.3rem 0.45rem; margin-bottom: 0.3rem; font-size: 0.78rem;
+    }
+    .fl-row.is-off { background: #f4f7f9; }
+    .fl-row.is-off .fl-name input { color: #9aa4ae; }
+    .fl-row.dragging { opacity: 0.35; }
+    .fl-row.drop-target { border-color: var(--primary-color); }
+    .fl-row .fl-grip { cursor: grab; color: #b0bac4; user-select: none; flex: 0 0 auto; }
+    .fl-row .fl-pos { display: flex; flex-direction: column; gap: 1px; flex: 0 0 auto; }
+    .container .fl-row button.fl-move {
+        width: auto; margin: 0; padding: 0 0.28rem; font-size: 0.5rem;
+        line-height: 1.35; background: #eef2f6; color: var(--secondary-color);
+        border-radius: 2px;
+    }
+    .container .fl-row button.fl-move:hover { background: #dde5ec; }
+    .container .fl-row button.fl-move:disabled { opacity: 0.3; background: #eef2f6; cursor: default; }
+    .fl-row .fl-name { flex: 1; min-width: 0; }
+    .fl-row .fl-name input {
+        width: 100%; margin: 0; padding: 0.25rem 0.4rem; font-size: 0.78rem;
+        border: 1.5px solid #cfd6dc; border-radius: 3px; text-transform: none;
+    }
+    .fl-row .fl-name input::placeholder { color: #a9b3bc; font-style: italic; }
+    .fl-row .fl-key {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.66rem; color: #8b98a5; white-space: nowrap;
+    }
+    /* Where an eVerify key would be, the field a computed one comes from. */
+    .fl-row .fl-key.fl-computed { font-style: italic; cursor: help; }
+    .fl-togs { display: flex; gap: 0.75rem; flex: 0 0 auto; }
+    .fl-tog { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; }
+    .fl-tog .fl-lab { font-size: 0.58rem; font-weight: 700; color: #66717c; }
+    .fl-tog .fl-na {
+        font-size: 0.78rem; color: #c3ccd4; line-height: 1.4;
+        width: 32px; text-align: center; cursor: help;
+    }
+    .fl-sw { position: relative; width: 32px; height: 18px; flex: 0 0 auto; display: inline-block; }
+    .fl-sw input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+    .fl-sw .fl-track {
+        position: absolute; inset: 0; background: #c3ccd4; border-radius: 18px;
+        transition: background-color 0.15s; pointer-events: none;
+    }
+    .fl-sw .fl-track::before {
+        content: ""; position: absolute; height: 14px; width: 14px; left: 2px; top: 2px;
+        background: #fff; border-radius: 50%; transition: transform 0.15s;
+    }
+    .fl-sw input:checked + .fl-track { background: var(--primary-color); }
+    .fl-sw input:checked + .fl-track::before { transform: translateX(14px); }
+    .fl-sw input:focus-visible + .fl-track { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+
+    .fl-preview {
+        border: 1px solid var(--border-color); border-radius: 4px;
+        background: #fbfcfd; padding: 0.6rem 0.7rem;
+    }
+    .fl-preview + .fl-preview { margin-top: 0.7rem; }
+    .fl-preview h4 {
+        margin: 0 0 0.4rem; font-size: 0.6rem; letter-spacing: 0.08em;
+        text-transform: uppercase; color: #8b98a5; font-weight: 700;
+    }
+    .fl-doc-mini { border-collapse: collapse; width: 100%; }
+    .fl-doc-mini td {
+        border: 1px solid var(--border-color); padding: 0.14rem 0.35rem;
+        font-size: 0.66rem; background: #f2f5f8; color: var(--secondary-color);
+        font-weight: 600;
+    }
+    .fl-csv-mini {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.6rem; color: #55606b; word-break: break-all; line-height: 1.55;
+    }
+    .fl-csv-mini .fl-fixed { color: #aab4be; }
+    .fl-none { color: #a9b3bc; font-style: italic; font-size: 0.66rem; }
+    .fl-actions { display: flex; gap: 0.5rem; align-items: center; margin-top: 1rem; flex-wrap: wrap; }
+    .container button.btn-reset {
+        width: auto; margin-top: 0; padding: 0.5rem 1rem; font-size: 0.8rem;
+        background: #6c757d;
+    }
+    .container button.btn-reset:hover { background: #5a6268; }
+
+    .breadcrumb {
+        display: flex; align-items: center; gap: 0.4rem;
+        font-size: 0.8rem; color: #666; margin-bottom: 1rem;
+    }
+    .breadcrumb b { color: var(--secondary-color); }
+
+    .member-list { list-style: none; padding: 0; margin: 0; }
+    .member-item {
+        border: 1px solid var(--border-color); border-radius: 4px;
+        padding: 0.5rem 0.75rem; margin-bottom: 0.4rem; background: #fff;
+        display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;
+    }
+    .member-item .who { flex: 1; min-width: 0; font-weight: 600; }
+    .member-item .ids { font-size: 0.75rem; color: #666; font-weight: 400; }
+    .tier-toggle {
+        display: flex; align-items: center; gap: 0.3rem; margin: 0;
+        font-size: 0.75rem; font-weight: 400; color: #555; white-space: nowrap;
+    }
+    .container .tier-toggle input { width: auto; margin: 0; }
+    .container button.btn-remove {
+        background-color: #dc3545; width: auto;
+        padding: 0.25rem 0.6rem; font-size: 0.75rem; margin-top: 0;
+    }
+    .container button.btn-remove:hover { background-color: #b02a37; }
+    .assign-form {
+        display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap;
+        margin-bottom: 1rem; padding: 1rem; background: #f8f9fa;
+        border-radius: 4px; border: 1px solid var(--border-color);
+    }
+    .assign-form .form-group { margin-bottom: 0; flex: 1; min-width: 150px; }
+    .assign-form .form-group label { font-size: 0.75rem; margin-bottom: 0.2rem; }
+    .assign-form .form-group input, .assign-form .form-group select {
+        padding: 0.5rem 0.6rem; font-size: 0.85rem;
+    }
+    .container button.btn-add {
+        width: auto; padding: 0.5rem 1rem; font-size: 0.85rem;
+        margin-top: 0; white-space: nowrap; align-self: flex-end;
+    }
+    .copy-creds {
+        background: #f8f9fa;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        padding: 0.75rem 0.85rem;
+        margin-bottom: 1rem;
+    }
+    .copy-creds-label {
+        font-size: 0.75rem; font-weight: 600; color: #666;
+        text-transform: uppercase; letter-spacing: 0.04em;
+        margin-bottom: 0.4rem;
+    }
+    .copy-creds-row { display: flex; gap: 0.5rem; align-items: center; }
+    .copy-creds-row select {
+        flex: 1; min-width: 0;
+        padding: 0.5rem 0.6rem; font-size: 0.85rem;
+        border: 1.5px solid #999; border-radius: 4px;
+        background: #fff; color: var(--text-color); font-family: inherit;
+    }
+    #copy-status {
+        margin-bottom: 1rem; padding: 0.65rem 0.85rem; border-radius: 4px;
+        font-size: 0.85rem; display: none;
+    }
+    #copy-status.success { display: block; background: #e9f7ec; color: #28a745; border: 1px solid #28a745; }
+    #copy-status.error { display: block; background: #fdecea; color: #dc3545; border: 1px solid #dc3545; }
+
+    #member-status {
+        margin-bottom: 1rem; padding: 0.65rem 0.85rem; border-radius: 4px;
+        font-size: 0.85rem; display: none;
+    }
+    #member-status.success { display: block; background: #e9f7ec; color: #28a745; border: 1px solid #28a745; }
+    #member-status.error { display: block; background: #fdecea; color: #dc3545; border: 1px solid #dc3545; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container">
+    {% csrf_token %}
+    {% include "includes/app_nav.html" with active_nav="site" %}
+
+    <div class="breadcrumb">
+        <a href="{% url 'site_admin' %}">Organizations</a>
+        <span>&rsaquo;</span>
+        <b>{% if is_new %}New organization{% else %}{{ org.name }}{% endif %}</b>
+    </div>
+
+    {% comment %}
+    Two columns on a wide window: the form on the left, People and Lists
+    beside it, and the field editor across the whole width below. The cards
+    stay in this order -- the order a narrow window shows -- and
+    .org-cols places them. A new organization has only the form, which
+    lands where it will be once it exists.
+    {% endcomment %}
+    <div class="org-cols">
+    <div class="card org-cols-form">
+        {% if is_new %}
+        <div class="info-box">
+            Nothing is created until you press <b>Create organization</b>.
+            Leaving this page leaves nothing behind.
+            <br><br>
+            People and the eVerify field list are set on this same page once it
+            exists.
+        </div>
+        {% endif %}
+
+        {% if message %}<div class="status-box success">{{ message }}</div>{% endif %}
+        {% if error %}<div class="status-box error">{{ error }}</div>{% endif %}
+
+        <form method="post" autocomplete="off" id="org-form"
+              action="{% if is_new %}{% url 'site_new_org' %}{% else %}{% url 'site_organization' org.id %}{% endif %}">
+            {% csrf_token %}
+
+            <div class="org-titlerow">
+                {% if org.logo_data %}
+                <img class="org-title-logo" src="{{ org.logo_data }}" alt="">
+                {% elif not is_new %}
+                <span class="org-mark" style="background:{{ org.mark_color }};">{{ org.initials }}</span>
+                {% endif %}
+                <span class="org-title-name">
+                    {% if is_new %}New organization{% else %}{{ org.name }}{% endif %}
+                </span>
+                {% if not is_new %}
+                    {% if org.everify_configured %}
+                    <span class="role-badge role-ok">eVerify configured</span>
+                    {% else %}
+                    <span class="role-badge role-none">No eVerify credentials</span>
+                    {% endif %}
+                {% endif %}
+                <label class="org-enabled" for="is_active">
+                    <span>Enabled</span>
+                    <span class="switch">
+                        <input type="checkbox" id="is_active" name="is_active"
+                               {% if org.is_active %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </span>
+                </label>
+            </div>
+            <div class="hint org-enabled-hint">
+                Disabled: nobody can select this organization at sign-in, and open
+                sessions inside it end on the next request. People, locations and
+                past transactions are kept.
+            </div>
+
+            <div class="setup-section setup-section--first">
+                <h3>Identity</h3>
+                <div class="id-row">
+                    <div style="text-align:center;">
+                        <div id="logo-preview">
+                            {% if org.logo_data %}
+                            <img class="org-logo" src="{{ org.logo_data }}" alt=""
+                                 style="max-height:64px; max-width:140px; border-radius:8px;">
+                            {% else %}
+                            <span class="org-mark lg" style="background:{{ org.mark_color }};">{{ org.initials }}</span>
+                            {% endif %}
+                        </div>
+                        <input type="file" id="logo-file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none;">
+                        <input type="hidden" name="logo_data" id="logo-data" value="">
+                        <label for="logo-file" class="btn btn-secondary btn-sm"
+                               style="margin-top:0.5rem; cursor:pointer; font-size:0.75rem;">Upload logo</label>
+                        {% if org.logo_data %}
+                        <label style="font-weight:400; font-size:0.75rem; display:block; margin-top:0.35rem;">
+                            <input type="checkbox" name="clear_logo" style="width:auto; margin-right:0.3rem;">Clear
+                        </label>
+                        {% endif %}
+                    </div>
+                    <div class="id-fields">
+                        <div class="form-group">
+                            <label for="name">Organization name</label>
+                            <input type="text" id="name" name="name" value="{{ org.name }}" maxlength="255" required>
+                        </div>
+                        <div class="grid3">
+                            <div class="form-group">
+                                <label for="subtitle">Banner subtitle</label>
+                                <input type="text" id="subtitle" name="subtitle" value="{{ org.subtitle }}"
+                                       maxlength="255" placeholder="Optional">
+                            </div>
+                            <div class="form-group">
+                                <label for="issuer_code">Issuer code</label>
+                                <input type="text" id="issuer_code" name="issuer_code"
+                                       value="{{ org.issuer_code|default:"" }}"
+                                       maxlength="8" pattern="[A-Za-z0-9]{2,8}"
+                                       style="text-transform:uppercase;"
+                                       placeholder="e.g. PSA">
+                            </div>
+                            <div class="form-group">
+                                <label for="mark_color">Mark colour</label>
+                                <input type="color" id="mark_color" name="mark_color" value="{{ org.mark_color }}"
+                                       style="padding:0.2rem; height:38px; max-width:88px;">
+                            </div>
+                        </div>
+                        <div class="hint">
+                            The issuer code names this organization inside the offline
+                            credential in a document&rsquo;s QR. Kept short because the QR
+                            is at the limit of what a printed stamp can carry, and stable
+                            because it is signed into credentials that outlive a rename.
+                            Letters and digits only.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setup-section">
+                <h3>Address</h3>
+                <div class="hint" style="margin-top:0; margin-bottom:0.85rem;">
+                    Where this organization is. Every field is optional, and nothing
+                    here is printed on a verification document.
+                </div>
+                <div class="form-group">
+                    <label for="address_line1">Address line 1</label>
+                    <input type="text" id="address_line1" name="address_line1"
+                           value="{{ org.address_line1 }}" maxlength="255"
+                           placeholder="Building, number and street">
+                </div>
+                <div class="form-group">
+                    <label for="address_line2">Address line 2</label>
+                    <input type="text" id="address_line2" name="address_line2"
+                           value="{{ org.address_line2 }}" maxlength="255"
+                           placeholder="Optional">
+                </div>
+                <div class="grid2">
+                    <div class="form-group">
+                        <label for="barangay">Barangay</label>
+                        <input type="text" id="barangay" name="barangay"
+                               value="{{ org.barangay }}" maxlength="120">
+                    </div>
+                    <div class="form-group">
+                        <label for="municipality">City or municipality</label>
+                        <input type="text" id="municipality" name="municipality"
+                               value="{{ org.municipality }}" maxlength="120">
+                    </div>
+                </div>
+                <div class="grid2">
+                    <div class="form-group">
+                        <label for="postal_code">Postal code</label>
+                        <input type="text" id="postal_code" name="postal_code"
+                               value="{{ org.postal_code }}" maxlength="16">
+                    </div>
+                    <div class="form-group">
+                        <label for="country">Country</label>
+                        <input type="text" id="country" name="country"
+                               value="{{ org.country }}" maxlength="120"
+                               placeholder="Philippines">
+                    </div>
+                </div>
+            </div>
+
+            <div class="setup-section">
+                <h3>Contact</h3>
+                <div class="hint" style="margin-top:0; margin-bottom:0.85rem;">
+                    Who to ask about this organization. A named person, so Demo Mode
+                    redacts all three &mdash; a redacted value posted back keeps what is
+                    stored rather than saving the bullets.
+                </div>
+                <div class="form-group">
+                    <label for="contact_person">Contact person</label>
+                    <input type="text" id="contact_person" name="contact_person"
+                           value="{{ org.contact_person|demo_name:demo_mode }}"
+                           maxlength="255" {% if demo_mode %}readonly{% endif %}
+                           placeholder="Full name">
+                </div>
+                <div class="grid2">
+                    <div class="form-group">
+                        <label for="contact_email">Email</label>
+                        <input type="text" id="contact_email" name="contact_email"
+                               value="{{ org.contact_email|demo_id:demo_mode }}"
+                               maxlength="254" {% if demo_mode %}readonly{% endif %}
+                               autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="contact_mobile">Mobile number</label>
+                        <input type="text" id="contact_mobile" name="contact_mobile"
+                               value="{{ org.contact_mobile|demo_id:demo_mode }}"
+                               maxlength="32" {% if demo_mode %}readonly{% endif %}
+                               placeholder="+63 900 000 0000">
+                    </div>
+                </div>
+            </div>
+
+            <div class="setup-section">
+                <h3>eVerify credentials</h3>
+                {% if not org.everify_configured and not is_new %}
+                <div class="status-box error" style="margin-top:0;">
+                    No credentials set. This organization cannot verify anyone until a
+                    base URL, client ID and client secret are saved.
+                </div>
+                {% endif %}
+                <div class="hint" style="margin-bottom:0.85rem;">
+                    Used for verifications performed by this organization, and what its
+                    usage is billed to. Operator sign-in uses the site-level client in
+                    Setup instead. There is no fallback between them.
+                </div>
+
+                {% comment %}
+                Copying happens on the server from an organization id. The
+                secret and public key are write-only and are never rendered
+                into a page, so a "copy" that filled in the field below would
+                have to send them to a browser.
+                {% endcomment %}
+                {% if credential_sources %}
+                <div id="copy-status"></div>
+                <div class="copy-creds">
+                    <div class="copy-creds-label">Copy an existing client</div>
+                    <div class="copy-creds-row">
+                        <select id="copy-source" aria-label="Organization to copy eVerify credentials from">
+                            <option value="">Choose an organization&hellip;</option>
+                            {% for source in credential_sources %}
+                            <option value="{{ source.id }}">{{ source.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="button" class="btn-add" id="btn-copy-creds">Copy</button>
+                    </div>
+                    <div class="hint" style="margin-top:0.4rem;">
+                        Replaces all four fields below straight away, without saving the
+                        rest of this form. Both organizations then verify against the same
+                        client, so their usage bills together and cannot be told apart at
+                        eVerify.
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="form-group">
+                    <label for="everify_base_url">Base URL</label>
+                    <input type="url" id="everify_base_url" name="everify_base_url"
+                           value="{{ org.everify_base_url|demo_url:demo_mode }}" maxlength="255"
+                           {% if demo_mode %}readonly{% endif %}
+                           placeholder="https://ws.everify.gov.ph/api">
+                </div>
+                <div class="form-group">
+                    <label for="everify_client_id">Client ID</label>
+                    <input type="text" id="everify_client_id" name="everify_client_id"
+                           value="{{ org.everify_client_id|demo_id:demo_mode }}" maxlength="255"
+                           {% if demo_mode %}readonly{% endif %} autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="everify_client_secret">Client Secret</label>
+                    <input type="password" id="everify_client_secret" name="everify_client_secret"
+                           value="" autocomplete="new-password"
+                           placeholder="{% if org.everify_client_secret %}Stored - leave blank to keep{% else %}Not set{% endif %}">
+                    <div class="hint">
+                        Status:
+                        {% if org.everify_client_secret %}
+                            <strong>set</strong>. Never shown again after saving; leave blank to
+                            keep it, or type a new one to replace it.
+                            <label style="font-weight:400;">
+                                <input type="checkbox" name="clear_everify_secret" value="1"
+                                       style="width:auto; margin-right:0.35rem;">Clear the stored secret
+                            </label>
+                        {% else %}
+                            <strong>not set</strong>. eVerify shows the secret once at issue; paste it here.
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="everify_public_api_key">Public API Key</label>
+                    <input type="password" id="everify_public_api_key" name="everify_public_api_key"
+                           value="" autocomplete="new-password"
+                           placeholder="{% if org.everify_public_api_key %}Stored - leave blank to keep{% else %}Not set{% endif %}">
+                    <div class="hint">
+                        Used by the liveness SDK in the operator's browser.
+                        {% if org.everify_public_api_key %}
+                        <label style="font-weight:400;">
+                            <input type="checkbox" name="clear_everify_public_key" value="1"
+                                   style="width:auto; margin-right:0.35rem;">Clear the stored key
+                        </label>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-save">
+                {% if is_new %}Create organization{% else %}Save organization{% endif %}
+            </button>
+        </form>
+    </div>
+
+    {% comment %}
+    Everything below needs a row to hang off: a membership, a field setting and
+    a transaction count all name an organization that does not exist yet. The
+    form above is what brings it into being.
+    {% endcomment %}
+    {% if not is_new %}
+    <div class="card org-cols-people">
+        <h2>People</h2>
+        <div id="member-status"></div>
+
+        <div class="assign-form">
+            <div class="form-group">
+                <label for="assign-card">National ID Card Number</label>
+                <input type="text" id="assign-card" placeholder="e.g. 1234-5678-9012-3456">
+            </div>
+            <div class="form-group" style="max-width:150px;">
+                <label for="assign-digital">Digital National ID</label>
+                <input type="text" id="assign-digital" placeholder="optional" style="text-transform:uppercase;">
+            </div>
+            <div class="form-group" style="max-width:130px;">
+                <label for="assign-role">Role</label>
+                <select id="assign-role">
+                    {% for value, label in roles %}
+                    <option value="{{ value }}" {% if value == 'admin' %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button class="btn-add" id="btn-assign">Assign</button>
+        </div>
+
+        <ul class="member-list">
+            {% for m in memberships %}
+            <li class="member-item" data-user="{{ m.user.id }}">
+                <span class="who">
+                    {{ m.user.display_name|demo_name:demo_mode }}
+                    <span class="ids">&middot; {{ m.user.national_id_formatted|demo_id:demo_mode }}{% if m.user.digital_national_id %} &middot; {{ m.user.digital_national_id|demo_id:demo_mode }}{% endif %}</span>
+                </span>
+                <span class="role-badge {% if m.is_admin %}role-admin{% else %}role-operator{% endif %}">{{ m.get_role_display }}</span>
+                <label class="tier-toggle">
+                    <input type="checkbox" data-tier-url="{% url 'site_restricted_tier' m.user.id %}"
+                           {% if m.user.device_restricted_tier %}checked{% endif %}>
+                    Phones read details
+                </label>
+                <button type="button" class="btn-remove" data-user="{{ m.user.id }}">Remove</button>
+            </li>
+            {% empty %}
+            <li style="text-align:center; color:#999; padding:0.75rem; font-size:0.85rem;">
+                Nobody assigned yet.
+            </li>
+            {% endfor %}
+        </ul>
+
+        <div class="hint">
+            Assign at least one admin, then let them take over: they manage locations,
+            transaction types and everyone else from their own Organization page.
+        </div>
+        <div class="hint">
+            <strong>Phones read details</strong>: the person's paired phones read the
+            holder's name, birth date and ID numbers, from <em>every</em>
+            organization's documents, not only this one's. Off, they confirm a
+            document is genuine. Only a site administrator can turn it on; people an
+            organization admin adds start with it off. A change reaches their phones
+            at the next sync.
+        </div>
+    </div>
+
+    <div class="card org-cols-fields">
+        <h2>eVerify fields</h2>
+        <div id="fields-status"></div>
+        <div class="info-box">
+            Every field a Tier&nbsp;II lookup returns, in one list. <b>Display</b>
+            puts it on the verification document; <b>Log</b> records it in the
+            transaction log, and switching Log off means the value is not kept at
+            all, so it cannot be exported later either. A field with both off is
+            never asked for.
+            <br><br>
+            One order, shared: the document prints its rows in this order and the
+            export takes its columns from the same order, skipping what is not
+            logged. Drag a row or use the arrows.
+            <br><br>
+            The name is what the document prints and what the CSV column is called.
+            The fourteen at the top came with names, and so did Email Address,
+            Mobile Number and Residency Status; the rest show their eVerify key
+            until you give them one.
+            <br><br>
+            <b>Age</b> is not returned by eVerify: it is worked out from the date of
+            birth on the day of the verification, and logged as it was that day.
+            Displayed, it also follows the name at the top of the document. It is
+            never put in the signed credential or on the phone card.
+        </div>
+
+        <div class="fields-split">
+            <div class="fl-list-col">
+                <ul class="fl-list" id="fl-list">
+                    {% for f in fields %}
+                    {% if forloop.counter0 == known_fields %}
+                    <li class="fl-group" id="fl-divider">Also returned, not previously used
+                        <span class="fl-count">({{ also_returned }})</span></li>
+                    {% endif %}
+                    <li class="fl-row{% if not f.display and not f.log %} is-off{% endif %}"
+                        draggable="true" data-key="{{ f.key }}"
+                        data-known="{% if f.known %}1{% else %}0{% endif %}"
+                        data-loggable="{% if f.loggable %}1{% else %}0{% endif %}">
+                        <span class="fl-grip" title="Drag to reorder">&#8759;</span>
+                        <span class="fl-pos">
+                            <button type="button" class="fl-move" data-move="up" title="Move up">&#9650;</button>
+                            <button type="button" class="fl-move" data-move="down" title="Move down">&#9660;</button>
+                        </span>
+                        <span class="fl-name">
+                            <input type="text" class="fl-name-input" value="{{ f.name }}"
+                                   placeholder="{{ f.key }}"
+                                   aria-label="Name for {{ f.key }} on the document">
+                        </span>
+                        {% if f.computed %}
+                        <span class="fl-key fl-computed"
+                              title="Not returned by eVerify: worked out from {{ f.computed }} on the day of the verification.">from {{ f.computed }}</span>
+                        {% else %}
+                        <span class="fl-key">{{ f.key }}</span>
+                        {% endif %}
+                        <span class="fl-togs">
+                            <span class="fl-tog">
+                                <span class="fl-sw">
+                                    <input type="checkbox" class="fl-show"
+                                           {% if f.display %}checked{% endif %}
+                                           aria-label="Show {{ f.key }} on the document">
+                                    <span class="fl-track"></span>
+                                </span>
+                                <span class="fl-lab">Display</span>
+                            </span>
+                            <span class="fl-tog">
+                                {% if f.loggable %}
+                                <span class="fl-sw">
+                                    <input type="checkbox" class="fl-log"
+                                           {% if f.log %}checked{% endif %}
+                                           aria-label="Record {{ f.key }} in the transaction log">
+                                    <span class="fl-track"></span>
+                                </span>
+                                <span class="fl-lab">Log</span>
+                                {% else %}
+                                <span class="fl-na"
+                                      title="This value cannot be readily logged, so it never is.">&mdash;</span>
+                                <span class="fl-lab">Log</span>
+                                {% endif %}
+                            </span>
+                        </span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div class="fl-preview-col">
+                <div class="fl-preview">
+                    <h4>Verification document</h4>
+                    <table class="fl-doc-mini"><tbody id="fl-prev-doc"></tbody></table>
+                </div>
+                <div class="fl-preview">
+                    <h4>Transaction log &middot; header row</h4>
+                    <div class="fl-csv-mini" id="fl-prev-csv"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="fl-actions">
+            <button type="button" class="btn-save" id="btn-save-fields">Save fields</button>
+            <button type="button" class="btn-reset" id="btn-reset-fields">Reset to defaults</button>
+            <span class="hint" style="margin:0;">
+                The list itself is fixed &mdash; adding a key is a code change.
+            </span>
+        </div>
+    </div>
+
+    {% comment %}
+    One grid cell, two cards: Lists, then Credential signing under it.
+    {% endcomment %}
+    <div class="org-cols-lists">
+    <div class="card">
+        <h2>Lists and history</h2>
+        <div class="info-box" style="margin-bottom:0;">
+            {{ location_count }} location{{ location_count|pluralize }},
+            {{ type_count }} transaction type{{ type_count|pluralize }},
+            {{ transaction_count }} transaction{{ transaction_count|pluralize }} recorded.
+            Locations and transaction types are managed by this organization's own
+            admins, so there is only ever one screen that owns each list.
+        </div>
+    </div>
+    {% include "includes/signing_org.html" with upload=True %}
+    </div>
+    {% endif %}
+    </div>{# /.org-cols #}
+
+    {% include "includes/branding_footer.html" %}
+</div>
+
+<script nonce="{{ csp_nonce }}">
+(function() {
+    var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    // The logo is read in the browser and submitted as a data URI; the server
+    // re-validates it against the real magic bytes.
+    var logoFile = document.getElementById('logo-file');
+    if (logoFile) {
+        logoFile.addEventListener('change', function() {
+            var file = this.files && this.files[0];
+            if (!file) { return; }
+            if (file.size > 256 * 1024) {
+                alert('Logo must be 256 KB or smaller.');
+                this.value = '';
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function() {
+                document.getElementById('logo-data').value = reader.result;
+                document.getElementById('logo-preview').innerHTML =
+                    '<img class="org-logo" src="' + reader.result +
+                    '" alt="" style="max-height:64px; max-width:140px; border-radius:8px;">';
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    {% if not is_new %}
+    // --- Copy an eVerify client from another organization ---------------
+    // Only the source organization's ID leaves the browser. The secret and
+    // the public key stay on the server, which is what keeps them write-only.
+    var copyBtn = document.getElementById('btn-copy-creds');
+    if (copyBtn) {
+        var copyStatus = document.getElementById('copy-status');
+        var copySource = document.getElementById('copy-source');
+
+        copyBtn.addEventListener('click', function() {
+            var sourceId = copySource.value;
+            if (!sourceId) {
+                copyStatus.textContent = 'Choose an organization to copy from.';
+                copyStatus.className = 'error';
+                return;
+            }
+            var sourceName = copySource.options[copySource.selectedIndex].text;
+            // Deliberately one flat concatenation with no escape sequences.
+            // A "\n" written here has to survive the template file, and an
+            // escape that gets unescaped en route turns into a real newline
+            // inside a string literal -- which is a syntax error that kills
+            // every handler in this script block, not just this one.
+            var warning = 'Copy ' + sourceName + "'s eVerify client to "
+                        + "{{ org.name|escapejs }}?"
+                        + ' Both organizations will then verify against the same'
+                        + ' client, so their usage bills together.'
+                        + ' This saves immediately, and any unsaved edits above'
+                        + ' will be lost.';
+            if (!confirm(warning)) {
+                return;
+            }
+            copyBtn.disabled = true;
+            fetch('{% url "site_copy_credentials" org.id %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ source_id: sourceId })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                copyBtn.disabled = false;
+                if (resp.status === 'ok') {
+                    copyStatus.textContent = resp.message;
+                    copyStatus.className = 'success';
+                    setTimeout(function() { location.reload(); }, 900);
+                } else {
+                    copyStatus.textContent = resp.message;
+                    copyStatus.className = 'error';
+                }
+            })
+            .catch(function() {
+                copyBtn.disabled = false;
+                copyStatus.textContent = 'Network error.';
+                copyStatus.className = 'error';
+            });
+        });
+    }
+
+    var statusEl = document.getElementById('member-status');
+    function showStatus(msg, isError) {
+        statusEl.textContent = msg;
+        statusEl.className = isError ? 'error' : 'success';
+    }
+
+    document.getElementById('btn-assign').addEventListener('click', function() {
+        var card = document.getElementById('assign-card').value.trim();
+        if (!card) { showStatus('National ID Card Number is required.', true); return; }
+        var btn = this;
+        btn.disabled = true;
+        fetch('{% url "site_assign_member" org.id %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({
+                national_id_card_number: card,
+                digital_national_id: document.getElementById('assign-digital').value.trim(),
+                role: document.getElementById('assign-role').value
+            })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(resp) {
+            btn.disabled = false;
+            if (resp.status === 'ok') {
+                showStatus(resp.message, false);
+                setTimeout(function() { location.reload(); }, 600);
+            } else { showStatus(resp.message, true); }
+        })
+        .catch(function() { btn.disabled = false; showStatus('Network error.', true); });
+    });
+
+    document.querySelectorAll('.btn-remove[data-user]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            if (!confirm('Remove this person from this organization? Their account and any other memberships are untouched.')) { return; }
+            var button = this;
+            var userId = button.dataset.user;
+            button.disabled = true;
+            fetch('{% url "site_remove_member" org.id %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ user_id: userId })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                if (resp.status === 'ok') {
+                    var row = document.querySelector('.member-item[data-user="' + userId + '"]');
+                    if (row) { row.remove(); }
+                    showStatus(resp.message, false);
+                } else {
+                    button.disabled = false;
+                    showStatus(resp.message, true);
+                }
+            })
+            .catch(function() { button.disabled = false; showStatus('Network error.', true); });
+        });
+    });
+
+    // Phones read details: a site administrator's switch on the person.
+    // Put back as it was if refused or cancelled.
+    document.querySelectorAll('input[data-tier-url]').forEach(function(box) {
+        box.addEventListener('change', function() {
+            var grant = box.checked;
+            var question = grant
+                ? 'Let this person’s phones read holders’ names, birth dates and ID numbers, from every organization’s documents?'
+                : 'Make this person’s phones confirm documents only?';
+            if (!confirm(question)) { box.checked = !grant; return; }
+            box.disabled = true;
+            fetch(box.dataset.tierUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ grant: grant })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                box.disabled = false;
+                if (resp.status === 'ok') {
+                    box.checked = resp.granted;
+                    showStatus(resp.message, false);
+                } else {
+                    box.checked = !grant;
+                    showStatus(resp.message, true);
+                }
+            })
+            .catch(function() {
+                box.disabled = false; box.checked = !grant;
+                showStatus('Network error.', true);
+            });
+        });
+    });
+
+    // --- eVerify fields -------------------------------------------------
+    // One ordered list. Position is read off the DOM at save time, so the
+    // arrows and the drag never have to agree about anything between them.
+    var flList = document.getElementById('fl-list');
+    if (flList) {
+        var flStatus = document.getElementById('fields-status');
+        var flDoc = document.getElementById('fl-prev-doc');
+        var flCsv = document.getElementById('fl-prev-csv');
+        var flDivider = document.getElementById('fl-divider');
+        var flSave = document.getElementById('btn-save-fields');
+        var flReset = document.getElementById('btn-reset-fields');
+
+        var CSV_HEAD = 'TRANSACTION_ID,ORGANIZATION,OPERATOR_NATIONAL_ID_NUMBER,OPERATOR_LOCATION,ACTING_AS_SITE_ADMIN,';
+        var CSV_TAIL = 'VERIFICATION_TIMESTAMP,AUTHENTICATION_RESULT,TRANSACTION_TYPE';
+
+        function flRows() {
+            return Array.prototype.slice.call(flList.querySelectorAll('.fl-row'));
+        }
+
+        function flLabel(row) {
+            var typed = row.querySelector('.fl-name-input').value.trim();
+            return typed || row.dataset.key;
+        }
+
+        function flHeading(label) {
+            var up = label.replace(/[^A-Za-z0-9]+/g, '_').toUpperCase();
+            up = up.replace(/^_+/, '').replace(/_+$/, '');
+            return up || 'FIELD';
+        }
+
+        // The whitelist sets where a field STARTS, not a permanent grouping:
+        // any row can be dragged anywhere. So the divider is only kept where
+        // it is still true -- the point after which every remaining row is
+        // one of the newer keys. Interleave them and it goes away rather
+        // than standing there misdescribing the list.
+        function flPlaceDivider() {
+            if (!flDivider) { return; }
+            var rows = flRows();
+            var cut = rows.length;
+            while (cut > 0 && rows[cut - 1].dataset.known !== '1') { cut--; }
+            if (cut <= 0 || cut >= rows.length) {
+                flDivider.style.display = 'none';
+                return;
+            }
+            flDivider.style.display = '';
+            flList.insertBefore(flDivider, rows[cut]);
+        }
+
+        function flPaint() {
+            var rows = flRows();
+            rows.forEach(function(row, index) {
+                var shown = row.querySelector('.fl-show').checked;
+                var logBox = row.querySelector('.fl-log');
+                var logged = !!logBox && logBox.checked;
+                row.classList.toggle('is-off', !shown && !logged);
+                row.querySelector('[data-move="up"]').disabled = index === 0;
+                row.querySelector('[data-move="down"]').disabled = index === rows.length - 1;
+            });
+            flPlaceDivider();
+            flPreview(rows);
+        }
+
+        function flPreview(rows) {
+            flDoc.textContent = '';
+            var shown = rows.filter(function(r) { return r.querySelector('.fl-show').checked; });
+            if (!shown.length) {
+                var tr = document.createElement('tr');
+                var td = document.createElement('td');
+                td.className = 'fl-none';
+                td.textContent = 'Nothing would print.';
+                tr.appendChild(td);
+                flDoc.appendChild(tr);
+            }
+            shown.forEach(function(row) {
+                var tr = document.createElement('tr');
+                var td = document.createElement('td');
+                td.textContent = flLabel(row);
+                tr.appendChild(td);
+                flDoc.appendChild(tr);
+            });
+
+            flCsv.textContent = '';
+            var head = document.createElement('span');
+            head.className = 'fl-fixed';
+            head.textContent = CSV_HEAD;
+            flCsv.appendChild(head);
+
+            var logged = rows.filter(function(r) {
+                var box = r.querySelector('.fl-log');
+                return box && box.checked;
+            });
+            flCsv.appendChild(document.createTextNode(
+                logged.map(function(r) { return flHeading(flLabel(r)); }).join(',')));
+
+            var tail = document.createElement('span');
+            tail.className = 'fl-fixed';
+            tail.textContent = (logged.length ? ',' : '') + CSV_TAIL;
+            flCsv.appendChild(tail);
+        }
+
+        flList.addEventListener('change', flPaint);
+        flList.addEventListener('input', function() { flPreview(flRows()); });
+
+        flList.addEventListener('click', function(e) {
+            var button = e.target.closest ? e.target.closest('.fl-move') : null;
+            if (!button) { return; }
+            var row = button.closest('.fl-row');
+            if (!row) { return; }
+            var rows = flRows();
+            var at = rows.indexOf(row);
+            if (button.dataset.move === 'up') {
+                if (at > 0) { flList.insertBefore(row, rows[at - 1]); }
+            } else if (at < rows.length - 1) {
+                flList.insertBefore(rows[at + 1], row);
+            }
+            flPaint();
+            button.focus();
+        });
+
+        var flDragged = null;
+        flList.addEventListener('dragstart', function(e) {
+            flDragged = e.target.closest ? e.target.closest('.fl-row') : null;
+            if (!flDragged) { return; }
+            flDragged.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            // Firefox refuses to start a drag with no payload set.
+            e.dataTransfer.setData('text/plain', flDragged.dataset.key);
+        });
+        flList.addEventListener('dragend', function() {
+            if (flDragged) { flDragged.classList.remove('dragging'); }
+            flDragged = null;
+            flRows().forEach(function(r) { r.classList.remove('drop-target'); });
+            flPaint();
+        });
+        flList.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            var over = e.target.closest ? e.target.closest('.fl-row') : null;
+            if (!over || !flDragged || over === flDragged) { return; }
+            flRows().forEach(function(r) { r.classList.remove('drop-target'); });
+            over.classList.add('drop-target');
+            var box = over.getBoundingClientRect();
+            var below = (e.clientY - box.top) > (box.height / 2);
+            flList.insertBefore(flDragged, below ? over.nextElementSibling : over);
+        });
+        flList.addEventListener('drop', function(e) { e.preventDefault(); });
+
+        function flCollect() {
+            return flRows().map(function(row, index) {
+                var logBox = row.querySelector('.fl-log');
+                return {
+                    key: row.dataset.key,
+                    display_name: row.querySelector('.fl-name-input').value.trim(),
+                    display: row.querySelector('.fl-show').checked,
+                    log: !!logBox && logBox.checked,
+                    position: index
+                };
+            });
+        }
+
+        function flPost(payload, button) {
+            button.disabled = true;
+            fetch('{% url "site_save_fields" org.id %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify(payload)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                button.disabled = false;
+                flStatus.textContent = resp.message;
+                flStatus.className = resp.status === 'ok' ? 'success' : 'error';
+                if (resp.status === 'ok' && payload.reset) {
+                    setTimeout(function() { location.reload(); }, 600);
+                }
+            })
+            .catch(function() {
+                button.disabled = false;
+                flStatus.textContent = 'Network error.';
+                flStatus.className = 'error';
+            });
+        }
+
+        flSave.addEventListener('click', function() {
+            flPost({ fields: flCollect() }, this);
+        });
+
+        flReset.addEventListener('click', function() {
+            if (!confirm('Put every field back to its default name, toggles and order? Nothing already logged is changed.')) { return; }
+            flPost({ reset: true }, this);
+        });
+
+        flPaint();
+    }
+    {% endif %}
+})();
+</script>
+{% endblock %}

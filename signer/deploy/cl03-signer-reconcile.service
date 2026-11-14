@@ -1,0 +1,39 @@
+[Unit]
+Description=OfflineVerifier signer: compare the ledger with verify's report
+
+[Service]
+Type=oneshot
+User=cl03-signer
+Group=cl03-signer
+ExecStart=/opt/cl03-signer/venv/bin/python -m signer reconcile --config /etc/cl03-signer/policy.toml
+WorkingDirectory=/opt/cl03-signer
+LoadCredential=aws-access-key-id:/etc/cl03-signer/credstore/aws-access-key-id
+LoadCredential=aws-secret-access-key:/etc/cl03-signer/credstore/aws-secret-access-key
+LoadCredential=report-token:/etc/cl03-signer/credstore/report-token
+# The signer's own sandbox: same user, same database, and it holds the
+# report token and the AWS credentials.
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+MemoryDenyWriteExecute=yes
+LockPersonality=yes
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+ReadWritePaths=/var/lib/cl03-signer

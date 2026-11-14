@@ -1,0 +1,21 @@
+# systemd unit for gunicorn. A template, like nginx.conf.tftpl: the boot
+# script installs it as /etc/systemd/system/gunicorn.service, and
+# `deploy/deploy.sh --check` compares the installed copy with it.
+[Unit]
+Description=Gunicorn daemon for verify Django app
+After=network.target
+
+[Service]
+User=${app_user}
+Group=${app_user}
+WorkingDirectory=${app_dir}/verify
+ExecStart=${app_dir}/venv/bin/gunicorn \
+    --config ${app_dir}/gunicorn.conf.py \
+    verify.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+EnvironmentFile=${app_dir}/.env
+
+[Install]
+WantedBy=multi-user.target

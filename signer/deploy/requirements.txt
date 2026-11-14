@@ -1,0 +1,3 @@
+# The signer's own venv (/opt/cl03-signer/venv), separate from verify's.
+cryptography>=44,<51
+boto3>=1.34,<2

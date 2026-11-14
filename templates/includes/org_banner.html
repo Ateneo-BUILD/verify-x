@@ -1,0 +1,27 @@
+{% comment %}
+The operating organization's identity. current_org, is_org_admin,
+is_site_admin and is_all_org_admin come from verify.context_processors.org_context, so no view has
+to remember to pass them.
+{% endcomment %}
+{% if current_org %}
+<div class="org-banner">
+    {% if current_org.logo_data %}
+        <img class="org-logo" src="{{ current_org.logo_data }}" alt="{{ current_org.name }}">
+    {% else %}
+        <span class="org-mark" style="background:{{ current_org.mark_color }};">{{ current_org.initials }}</span>
+    {% endif %}
+    <div class="org-id">
+        <div class="org-name">{{ current_org.name }}</div>
+        {% if current_org.subtitle %}<div class="org-sub">{{ current_org.subtitle }}</div>{% endif %}
+    </div>
+    {% if is_site_admin %}
+        <span class="role-badge role-site">Site admin</span>
+    {% elif is_all_org_admin %}
+        <span class="role-badge role-admin" title="Administers every organization, with no site-wide settings">Admin, every organization</span>
+    {% elif is_org_admin %}
+        <span class="role-badge role-admin">Admin</span>
+    {% else %}
+        <span class="role-badge role-operator">Operator</span>
+    {% endif %}
+</div>
+{% endif %}

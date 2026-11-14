@@ -1,0 +1,1296 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ site_title }}: National ID{% endblock %}
+
+{% block extra_head %}
+<script src="https://liveness.everify.gov.ph/js/everify-liveness-sdk.min.js"></script>
+<script src="{% static 'jsQR.min.js' %}?v={{ APP_VERSION }}"></script>
+<script src="{% static 'verify.js' %}?v={{ APP_VERSION }}"></script>
+{% include "includes/upstream_trace.html" %}
+<style>
+    .tabs {
+        display: flex;
+        border-bottom: 1px solid var(--border-color);
+        margin-bottom: 1.5rem;
+    }
+    .container button.tab-link {
+        background-color: transparent;
+        border: none;
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        font-size: 1rem;
+        color: var(--text-color);
+        border-bottom: 3px solid transparent;
+        margin-bottom: -1px;
+        width: auto;
+        margin-top: 0;
+    }
+    .container button.tab-link:hover { background-color: #f0f0f0; }
+    .container button.tab-link.active {
+        color: var(--primary-color);
+        border-bottom-color: var(--primary-color);
+        font-weight: 600;
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .form-group input[type="date"] {
+        width: 100%;
+        padding: 0.6rem 0.75rem;
+        border: 1.5px solid #999;
+        border-radius: 4px;
+        box-sizing: border-box;
+        font-size: 0.95rem;
+        font-family: inherit;
+    }
+
+    .qr-options { display: flex; gap: 1rem; }
+    .qr-options .container button, .qr-options .btn { flex: 1; margin: 0; }
+    #qr-scanner-container { display: none; margin-top: 1rem; position: relative; }
+    #qr-scanner-container video { width: 100%; border-radius: 4px; }
+    .container button#scan-frame-btn {
+        position: absolute;
+        bottom: 1rem;
+        left: 50%;
+        transform: translateX(-50%);
+        width: auto;
+        z-index: 10;
+        background-color: rgba(0, 0, 0, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        margin-top: 0;
+    }
+    .container button#scan-frame-btn:hover { background-color: rgba(0, 0, 0, 0.8); }
+
+    /* The outcome screen. A verification finishes somewhere whichever way
+       it goes -- a success leaves for /app/document/, a failure lands here --
+       so it is sized and coloured like a result, not like a warning stuck to
+       the bottom of a form. */
+    #verify-outcome { border-top: 5px solid var(--error-color); }
+    /* The outcome is one short task -- read it, then edit or start over --
+       so it keeps the centred column the one-task pages keep, rather than
+       stretching a two-column table across a whole wide window. */
+    #verify-outcome { max-width: 800px; margin-left: auto; margin-right: auto; }
+
+    /* The two steps side by side on a wide window, so the face check is in
+       view while the details are typed. Step 1 carries the tabs and the
+       form, so it takes the larger share. */
+    @media screen and (min-width: 1100px) {
+        #verify-steps.page-cols { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+    }
+    #verify-outcome.incomplete { border-top-color: #b8860b; }
+    .verdict { display: flex; gap: 1rem; align-items: flex-start; margin-bottom: 1.1rem; }
+    .verdict-mark {
+        flex: none; width: 46px; height: 46px; border-radius: 50%;
+        background: #fdecea; border: 2px solid var(--error-color);
+        color: var(--error-color); display: flex; align-items: center;
+        justify-content: center; font-size: 1.5rem; font-weight: 700;
+    }
+    #verify-outcome.incomplete .verdict-mark {
+        background: #fdf6e3; border-color: #b8860b; color: #8a6a1f;
+    }
+    .verdict h3 { font-size: 1.3rem; margin: 0 0 0.25rem; color: #7d1a25; }
+    #verify-outcome.incomplete .verdict h3 { color: #6b5314; }
+    .verdict p { font-size: 0.9rem; color: #555; margin: 0; }
+    .outcome-hint { margin-top: 0.35rem !important; color: #777 !important; }
+    .detail-table {
+        width: 100%; border-collapse: collapse;
+        font-size: 0.88rem; margin-bottom: 1.1rem;
+    }
+    .detail-table th, .detail-table td {
+        text-align: left; padding: 0.45rem 0.2rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .detail-table th { color: #666; font-weight: 600; width: 42%; }
+    .detail-table td { font-weight: 600; color: #222; }
+    .outcome-stamp { font-size: 0.78rem; color: #777; margin-bottom: 1.1rem; }
+    .outcome-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .container .outcome-actions button { margin-top: 0; flex: 1 1 12rem; }
+    .container button.btn-danger { background-color: #b02a37; }
+    .container button.btn-danger:hover { background-color: #8f222d; }
+
+    /* The face check the person already passed, offered back so a typo does
+       not put them in front of the camera a second time. */
+    .held-liveness {
+        display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+        font-size: 0.85rem; color: #1d6b32; background-color: #e9f7ec;
+        border: 1px solid var(--success-color); border-radius: 4px;
+        padding: 0.5rem 0.7rem; margin-top: 0.75rem;
+    }
+    .held-liveness .tick { font-weight: 700; }
+    .held-liveness .held-text { flex: 1; min-width: 12rem; }
+    .container .held-liveness button {
+        width: auto; margin-top: 0; padding: 0.4rem 0.9rem; font-size: 0.85rem;
+    }
+
+    /* Every error box can be cleared by hand; nothing on this page clears
+       itself. */
+    .container .status-box button.status-dismiss {
+        float: right; width: auto; margin: -0.15rem -0.25rem 0 0.75rem;
+        padding: 0 0.25rem; background: none; color: inherit;
+        font-size: 1.1rem; font-weight: 700; line-height: 1.2; opacity: 0.65;
+    }
+    .container .status-box button.status-dismiss:hover {
+        background: none; color: inherit; opacity: 1;
+    }
+    .or-divider {
+        text-align: center;
+        color: #666;
+        font-size: 0.9rem;
+        margin: 0.75rem 0;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<!-- Consent Modal (shown before each verification) -->
+<div id="consent-overlay" class="modal-overlay hidden">
+    <div class="modal-box">
+        <h2 class="primary">Consent for Identity Verification</h2>
+        <p>To proceed, we need your consent to collect and process your personal data, including your name, date of birth, and biometric photo, for the purpose of verifying your identity against the National ID system.</p>
+        <div class="consent-buttons">
+            <button id="consent-decline-btn" class="btn-secondary">Withhold Consent</button>
+            <button id="consent-accept-btn">Give Consent</button>
+        </div>
+    </div>
+</div>
+
+<!-- Main Container -->
+<div class="container" id="main-container">
+    {% csrf_token %}
+    {% include "includes/app_nav.html" with active_nav="verify" %}
+    {% include "includes/org_banner.html" %}
+    {% include "includes/context_strip.html" with verb="Verifying at" %}
+
+    {% if not everify_ready %}
+    <div class="status-box error" style="margin-bottom:1rem;">
+        {{ current_org.name }} has no eVerify credentials yet, so verification
+        cannot run here. An administrator has to add them on the Organization page.
+    </div>
+    {% endif %}
+
+    {% include "includes/liveness_overlay.html" %}
+
+    {% comment %}
+    The outcome screen. Every verification finishes somewhere: a success
+    leaves for /app/document/, a failure lands here. It replaces the two step
+    cards rather than sitting under them, so a failed verification cannot be
+    half-read and left on screen for the next person.
+
+    Nothing on this page clears itself. The form behind this card still holds
+    what the operator typed, and it is an operator action -- Edit Details or
+    Start Over -- that decides which.
+    {% endcomment %}
+    <div id="verify-outcome" class="card" hidden>
+        <div class="verdict">
+            <div class="verdict-mark" id="outcome-mark">&times;</div>
+            <div>
+                <h3 id="outcome-title"></h3>
+                <p id="outcome-body"></p>
+                <p id="outcome-hint" class="outcome-hint"></p>
+            </div>
+        </div>
+        <table class="detail-table"><tbody id="outcome-details"></tbody></table>
+        <div id="outcome-stamp" class="outcome-stamp"></div>
+        {% comment %}
+        The upstream call trace, sent only by a debugging instance. It is
+        built with textContent by its own renderer: these lines are response
+        bodies from a service this app does not control.
+        {% endcomment %}
+        <details id="verify-trace" class="err-trace" hidden>
+            <summary>What was asked of eVerify</summary>
+            <ol id="verify-trace-steps"></ol>
+        </details>
+        <div class="outcome-actions">
+            <button type="button" id="outcome-secondary" class="btn-secondary"></button>
+            <button type="button" id="outcome-primary" class="btn-danger"></button>
+        </div>
+    </div>
+
+    <div id="verify-steps" class="page-cols">
+    <!-- Step 1: Provide Your Data -->
+    <div class="card">
+        <h2>Step 1: Provide Your Data</h2>
+        <div class="tabs">
+            <button class="tab-link active" data-tab="qr-tab">Scan QR Code</button>
+            <button class="tab-link" data-tab="pcn-tab">Manual Entry</button>
+            <button class="tab-link" data-tab="demographic-tab">Demographic Form</button>
+        </div>
+
+        <!-- Tab 1: QR Code Scanner -->
+        <div id="qr-tab" class="tab-content active">
+            <div class="info-box">
+                <p>Scan the QR code from the National ID using your camera, or upload an image of it.</p>
+            </div>
+            <div class="qr-options">
+                <button id="start-qr-scan-btn" style="flex:1; margin:0;">Start Camera Scan</button>
+                <input type="file" id="qr-file-input" accept="image/*" style="display:none;">
+                <label for="qr-file-input" class="btn" style="flex:1; margin:0; cursor:pointer;">Upload QR Image</label>
+            </div>
+            <div id="qr-scanner-container">
+                <video id="qr-video" playsinline></video>
+                <button id="scan-frame-btn">Capture QR</button>
+            </div>
+            <canvas id="qr-canvas" style="display:none;"></canvas>
+            <div id="qr-status"></div>
+        </div>
+
+        <!-- Tab 2: Manual PCN Entry -->
+        <div id="pcn-tab" class="tab-content">
+            <div class="info-box">
+                <p>Enter either your National ID Card Number or Digital National ID Number.</p>
+            </div>
+            <div class="form-group">
+                <label for="pcn-input">National ID Card Number or Digital National ID Number</label>
+                {% comment %}
+                Masked exactly as the login page's field is: type="password"
+                is the platform's own masking, autocomplete="off" keeps a
+                National ID out of autofill, and Show ID is the operator's
+                own choice to reveal it (Verify.idMaskToggle).
+                {% endcomment %}
+                <div class="masked-id">
+                    <input type="password" id="pcn-input" placeholder="e.g., 1234-5678-9012-3456" autocomplete="off" spellcheck="false" style="text-transform:uppercase;">
+                    <button type="button" id="toggle-id-btn" aria-pressed="false">Show ID</button>
+                </div>
+            </div>
+        </div>
+        <!-- Tab 3: Demographic Form -->
+        <div id="demographic-tab" class="tab-content">
+            <form id="demographic-form">
+                <div class="form-group">
+                    <label for="first-name">First Name</label>
+                    <input type="text" id="first-name" placeholder="Juan">
+                </div>
+                <div class="form-group">
+                    <label for="middle-name">Middle Name</label>
+                    <input type="text" id="middle-name" placeholder="Santos">
+                </div>
+                <div class="form-group">
+                    <label for="last-name">Last Name</label>
+                    <input type="text" id="last-name" placeholder="Dela Cruz">
+                </div>
+                <div class="form-group">
+                    <label for="suffix">Suffix (Optional)</label>
+                    <input type="text" id="suffix" placeholder="JR">
+                </div>
+                <div class="form-group">
+                    <label for="birth-date">Birth Date</label>
+                    <input type="text" id="birth-date" placeholder="mm/dd/yyyy" maxlength="10" inputmode="numeric" autocomplete="off">
+                </div>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- Step 2: Verify Your Identity -->
+    <div class="card">
+        <h2>Step 2: Verify Your Identity</h2>
+        <div class="form-group" style="display:none;">
+            <label for="public-api-key">Public API Key (for Liveness SDK)</label>
+            <input type="text" id="public-api-key" placeholder="Fetching public key..." readonly>
+        </div>
+        <button id="start-verification-btn" disabled>Start Face Camera &amp; Verify</button>
+        <p id="zoom-hint" class="zoom-hint" hidden>For a clean camera view, reset browser zoom (Ctrl+0).</p>
+        {% if fingerprint.is_configured %}
+        <div class="or-divider">- or -</div>
+        <button id="start-fingerprint-btn" disabled>Scan Fingerprint &amp; Verify</button>
+        {% endif %}
+        {% comment %}
+        Shown only while a face check this operator already ran is still
+        inside its reuse window -- see holdLiveness() for what that costs and
+        what drops it.
+        {% endcomment %}
+        <div id="held-liveness" class="held-liveness" hidden>
+            <span class="tick">&#10003;</span>
+            <span class="held-text">Face check confirmed<span id="held-remaining"></span></span>
+            <button type="button" id="verify-held-btn">Verify Without New Face Scan</button>
+        </div>
+        <div id="liveness-status"></div>
+    </div>
+    </div><!-- /verify-steps -->
+
+    <!-- Branding Footer -->
+    {% include "includes/branding_footer.html" %}
+</div>
+
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('DOMContentLoaded', function() {
+    (function initializeApp() {
+        // --- DOM Elements ---
+        var publicKeyInput = document.getElementById('public-api-key');
+        var startVerificationBtn = document.getElementById('start-verification-btn');
+        var startFingerprintBtn = document.getElementById('start-fingerprint-btn');
+        var FINGERPRINT_ENDPOINT = "{{ fingerprint.auth_endpoint|default:''|escapejs }}";
+        var FINGERPRINT_SERIAL = "{{ fingerprint.serial_number|default:''|escapejs }}";
+        var livenessStatus = document.getElementById('liveness-status');
+        var verifyOutcome = document.getElementById('verify-outcome');
+        var verifySteps = document.getElementById('verify-steps');
+        var heldBox = document.getElementById('held-liveness');
+        var verifyHeldBtn = document.getElementById('verify-held-btn');
+        var startQrScanBtn = document.getElementById('start-qr-scan-btn');
+        var qrScannerContainer = document.getElementById('qr-scanner-container');
+        var qrVideo = document.getElementById('qr-video');
+        var qrCanvasElement = document.getElementById('qr-canvas');
+        var qrCanvas = qrCanvasElement.getContext('2d');
+        var qrStatusEl = document.getElementById('qr-status');
+        var pcnInput = document.getElementById('pcn-input');
+        var demographicForm = document.getElementById('demographic-form');
+        var scanFrameBtn = document.getElementById('scan-frame-btn');
+        var qrFileInput = document.getElementById('qr-file-input');
+        var livenessOverlay = document.getElementById('liveness-overlay');
+        var livenessOverlayText = document.getElementById('liveness-overlay-text');
+
+        var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')
+            ? document.querySelector('[name=csrfmiddlewaretoken]').value : '';
+
+        var QUERY_URL = '/everify/';
+        var LOG_FAILURE_URL = '/everify/log-liveness-failure/';
+
+        function logLivenessFailure(detail) {
+            var payload = { failure_detail: detail };
+            // Include lookup value if available
+            switch (activeTabId) {
+                case 'qr-tab': if (qrCodeValue) payload.value = qrCodeValue; break;
+                case 'pcn-tab': if (pcnInput.value) payload.value = pcnInput.value; break;
+                case 'demographic-tab':
+                    payload.first_name = document.getElementById('first-name').value;
+                    payload.middle_name = document.getElementById('middle-name').value;
+                    payload.last_name = document.getElementById('last-name').value;
+                    payload.birth_date = mmddyyyyToIso(document.getElementById('birth-date').value);
+                    break;
+            }
+            fetch(LOG_FAILURE_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify(payload)
+            }).catch(function() {});
+        }
+        var GET_PUBLIC_KEY_URL = '/everify/key/';
+
+        // --- State ---
+        var activeTabId = 'qr-tab';
+        var qrCodeValue = null;
+        var videoStream = null;
+        var animationFrameId;
+
+        // The face check the person standing here has already passed. It is
+        // held so that correcting a typo does not put them back in front of
+        // the camera -- the commonest reason a demographic lookup misses.
+        //
+        // Reusing it is safe for the same reason sending it the first time
+        // is: the session id is eVerify's, the server passes it straight
+        // through, and eVerify decides whether it is still good and whether
+        // the face belongs to the record it found. Nothing here decides who
+        // anybody is.
+        //
+        // What it must never outlive is the person. Start Over means the
+        // next person, so it drops the held check -- that is the rule this
+        // whole feature rests on.
+        var heldLiveness = null;
+        var heldTimer = null;
+        var LIVENESS_REUSE_MS = 180000;
+        // Which biometric the last attempt used, so Try Again repeats it.
+        var lastMethod = 'liveness';
+        // Which one it actually SENT. Not the same question: a face check
+        // the person cancelled leaves lastMethod at 'liveness' and must not
+        // let the outcome screen call it confirmed.
+        var lastBiometric = '';
+        // --- Liveness Overlay ---
+        function showLivenessOverlay(message) {
+            livenessOverlayText.textContent = message;
+            livenessOverlay.style.display = 'flex';
+        }
+        function hideLivenessOverlay() {
+            livenessOverlay.style.display = 'none';
+            var cover = document.getElementById('sdk-spinner-cover');
+            if (cover) cover.remove();
+        }
+        function releaseCamera() {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                try {
+                    document.querySelectorAll('video').forEach(function(v) {
+                        var stream = v.srcObject;
+                        if (stream) {
+                            stream.getTracks().forEach(function(t) { t.stop(); });
+                            v.srcObject = null;
+                        }
+                    });
+                } catch(e) {}
+            }
+            document.querySelectorAll('iframe[src*="everify"], iframe[src*="liveness"]').forEach(function(el) {
+                el.remove();
+            });
+        }
+
+        // --- Helper Functions ---
+        // An error stays until somebody clears it. Nothing on this page
+        // times out or wipes itself, so the dismiss button is the only way
+        // one leaves the screen.
+        function showStatus(element, message, isError) {
+            element.innerHTML = '<div class="status-box ' + (isError ? 'error' : 'success') + '">'
+                + (isError ? '<button type="button" class="status-dismiss" '
+                             + 'aria-label="Dismiss">&times;</button>' : '')
+                + message + '</div>';
+            var dismiss = element.querySelector('.status-dismiss');
+            if (dismiss) {
+                dismiss.addEventListener('click', function() { element.innerHTML = ''; });
+            }
+        }
+
+        function transportMessage(err) {
+            var detail = (err && err.message) ? err.message : String(err || '');
+            return 'Could not reach the server' + (detail ? ' (' + detail + ')' : '') + '.';
+        }
+
+        var ID_PATTERN = /^([A-Za-z]{3}\d{3,4}|\d{4}-?\d{4}-?\d{4}-?\d{4}|\d{16})$/;
+        var BIRTH_DATE_PATTERN = /^(0[1-9]|1[0-2])\/(0[1-9]|[12]\d|3[01])\/(\d{4})$/;
+
+        function mmddyyyyToIso(s) {
+            var m = (s || '').match(BIRTH_DATE_PATTERN);
+            return m ? (m[3] + '-' + m[1] + '-' + m[2]) : s;
+        }
+
+        // Whether the active tab holds enough to send. Asked by the two
+        // verify buttons AND by the reuse offer, from here rather than each
+        // working it out: the offer showing under different rules from the
+        // button inside it is exactly how it came to stand over a dead one.
+        function verifyDataReady() {
+            var isDataReady = false;
+            switch (activeTabId) {
+                case 'demographic-tab':
+                    var firstName = document.getElementById('first-name').value.trim();
+                    var lastName = document.getElementById('last-name').value.trim();
+                    var birthDate = document.getElementById('birth-date').value.trim();
+                    isDataReady = firstName && lastName && BIRTH_DATE_PATTERN.test(birthDate);
+                    break;
+                case 'qr-tab':
+                    isDataReady = !!qrCodeValue;
+                    break;
+                case 'pcn-tab':
+                    var val = pcnInput.value.trim();
+                    var raw = val.replace(/-/g, '');
+                    isDataReady = ID_PATTERN.test(val) || /^[A-Za-z]{3}\d{3,4}$/.test(raw) || /^\d{16}$/.test(raw);
+                    break;
+            }
+            return !!isDataReady;
+        }
+
+        function updateVerificationButtonState() {
+            var isDataReady = verifyDataReady();
+            startVerificationBtn.disabled = !isDataReady;
+            if (startFingerprintBtn) startFingerprintBtn.disabled = !isDataReady;
+            // The reuse offer is not disabled, it is withdrawn -- see
+            // renderHeldLiveness().
+            renderHeldLiveness();
+        }
+
+        // --- The held face check ---
+        function holdLiveness(sessionId) {
+            if (!sessionId) return;
+            heldLiveness = { sessionId: sessionId, at: Date.now() };
+            renderHeldLiveness();
+        }
+
+        function releaseLiveness() {
+            heldLiveness = null;
+            renderHeldLiveness();
+        }
+
+        function livenessRemainingMs() {
+            if (!heldLiveness) return 0;
+            return Math.max(0, LIVENESS_REUSE_MS - (Date.now() - heldLiveness.at));
+        }
+
+        // The offer stands only while it can actually be taken: a face check
+        // held, still inside the window, and a form with enough in it to
+        // send. Anything else and the section is not shown AT ALL.
+        //
+        // Not shown-but-disabled: a strip saying "Face check confirmed" over
+        // a button that does nothing reads as a fault in the page, and the
+        // operator has no way to tell which of the two is broken.
+        function canReuseFaceCheck() {
+            return !!heldLiveness && livenessRemainingMs() > 0 && verifyDataReady();
+        }
+
+        // The window is this app's own limit, not eVerify's -- nothing here
+        // knows when their session expires. If it has lapsed on their side
+        // first, the reused attempt comes back refused and lands on the
+        // outcome screen like any other, with the camera one press away.
+        function renderHeldLiveness() {
+            var left = livenessRemainingMs();
+            if (!canReuseFaceCheck()) {
+                // Expiry drops the check itself; a form that is merely not
+                // ready yet only withdraws the offer, and putting the form
+                // back in order brings it straight back -- every input event
+                // comes through updateVerificationButtonState().
+                if (left <= 0) heldLiveness = null;
+                heldBox.hidden = true;
+                if (heldTimer) { clearInterval(heldTimer); heldTimer = null; }
+                return;
+            }
+            var secs = Math.ceil(left / 1000);
+            document.getElementById('held-remaining').textContent =
+                ' \u2014 reusable for another ' + Math.floor(secs / 60)
+                + ':' + ('0' + (secs % 60)).slice(-2);
+            heldBox.hidden = false;
+            if (!heldTimer) heldTimer = setInterval(renderHeldLiveness, 1000);
+        }
+
+        function resetApplicationState() {
+            document.getElementById('first-name').value = '';
+            document.getElementById('middle-name').value = '';
+            document.getElementById('last-name').value = '';
+            document.getElementById('suffix').value = '';
+            document.getElementById('birth-date').value = '';
+            pcnInput.value = '';
+            qrCodeValue = null;
+            qrStatusEl.innerHTML = '';
+            var ctx = qrCanvasElement.getContext('2d');
+            ctx.clearRect(0, 0, qrCanvasElement.width, qrCanvasElement.height);
+            livenessStatus.innerHTML = '';
+            updateVerificationButtonState();
+        }
+
+        // Start Over: a different person is next, so the face check goes
+        // with the details. Nothing else in this file drops it.
+        function startOver() {
+            releaseLiveness();
+            resetApplicationState();
+            hideOutcome();
+        }
+
+        // --- The outcome screen ---
+        // Two failures wear one costume and they are not the same thing.
+        // eVerify answering "nobody" is a statement about the person; a 401
+        // is a statement about this deployment's credentials, made about
+        // somebody the service never looked at. Saying "cannot verify this
+        // person" after the second would be a lie, so the title, the mark,
+        // the hint and the primary action all follow the kind.
+        var OUTCOMES = {
+            nomatch: {
+                person: true,
+                title: 'Cannot verify this person',
+                fallback: 'No matching record found for the provided details.'
+            },
+            unverified: {
+                person: true,
+                title: 'Cannot verify this person',
+                fallback: 'eVerify returned a record but did not confirm it. '
+                          + 'Trying again with the same details returns the same answer.'
+            },
+            incomplete: {
+                person: false,
+                title: 'Verification could not be completed',
+                fallback: 'eVerify could not be reached.'
+            }
+        };
+
+        var OUTCOME_HINTS = {
+            'demographic-tab': 'Check the spelling of each name and the birth date, '
+                               + 'or try the National ID number instead.',
+            'pcn-tab': 'Check the number, or try the demographic form instead.',
+            'qr-tab': 'Scan the QR code again, or enter the number by hand.'
+        };
+
+        var INCOMPLETE_HINT = 'Nothing was looked up, so this says nothing about '
+                              + 'the person. The details entered are kept.';
+
+        function outcomeRow(label, value) {
+            if (!value) return null;
+            var tr = document.createElement('tr');
+            var th = document.createElement('th');
+            var td = document.createElement('td');
+            th.textContent = label;
+            td.textContent = value;
+            tr.appendChild(th);
+            tr.appendChild(td);
+            return tr;
+        }
+
+        function fillOutcomeDetails() {
+            var tbody = document.getElementById('outcome-details');
+            tbody.innerHTML = '';
+            var rows = [];
+            switch (activeTabId) {
+                case 'demographic-tab':
+                    rows.push(['First Name', document.getElementById('first-name').value]);
+                    rows.push(['Middle Name', document.getElementById('middle-name').value]);
+                    rows.push(['Last Name', document.getElementById('last-name').value]);
+                    rows.push(['Suffix', document.getElementById('suffix').value]);
+                    rows.push(['Birth Date', document.getElementById('birth-date').value]);
+                    break;
+                case 'pcn-tab':
+                    rows.push(['National ID', pcnInput.value]);
+                    break;
+                case 'qr-tab':
+                    rows.push(['Scanned ID', qrCodeValue || '']);
+                    break;
+            }
+            if (lastBiometric === 'fingerprint') {
+                rows.push(['Fingerprint', 'Captured']);
+            } else if (lastBiometric === 'face') {
+                rows.push(['Face check', 'Confirmed']);
+            }
+            rows.forEach(function(row) {
+                var tr = outcomeRow(row[0], row[1]);
+                if (tr) tbody.appendChild(tr);
+            });
+        }
+
+        function stampNow(detail) {
+            var when = new Date().toLocaleString('en-US', {
+                timeZone: 'Asia/Manila', month: '2-digit', day: '2-digit',
+                year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true
+            }).replace(',', '');
+            return 'Checked ' + when + (detail ? ' \u00b7 ' + detail : '');
+        }
+
+        // Every string written here is either the operator's own typing or a
+        // response body from a service this app does not control, so all of
+        // it goes in as text. showStatus() writes innerHTML; this does not.
+        function showOutcome(kind, info) {
+            var spec = OUTCOMES[kind] || OUTCOMES.incomplete;
+            info = info || {};
+            verifyOutcome.classList.toggle('incomplete', !spec.person);
+            document.getElementById('outcome-mark').textContent = spec.person ? '\u00d7' : '!';
+            document.getElementById('outcome-title').textContent = spec.title;
+            document.getElementById('outcome-body').textContent = info.message || spec.fallback;
+            document.getElementById('outcome-hint').textContent = spec.person
+                ? (OUTCOME_HINTS[activeTabId] || '')
+                : INCOMPLETE_HINT;
+            fillOutcomeDetails();
+            document.getElementById('outcome-stamp').textContent =
+                stampNow(info.status ? 'eVerify ' + info.status : '');
+
+            renderUpstreamTrace(document.getElementById('verify-trace'),
+                                document.getElementById('verify-trace-steps'),
+                                info.trace);
+
+            var primary = document.getElementById('outcome-primary');
+            var secondary = document.getElementById('outcome-secondary');
+            primary.textContent = spec.person ? 'Start Over'
+                : (heldLiveness ? 'Try Again Without New Face Scan' : 'Try Again');
+            secondary.textContent = spec.person ? 'Edit Details' : 'Start Over';
+            primary.setAttribute('data-act', spec.person ? 'clear' : 'retry');
+            secondary.setAttribute('data-act', spec.person ? 'edit' : 'clear');
+
+            verifySteps.hidden = true;
+            verifyOutcome.hidden = false;
+            window.scrollTo(0, 0);
+        }
+
+        function hideOutcome() {
+            verifyOutcome.hidden = true;
+            verifySteps.hidden = false;
+            // Renders the reuse offer too, through one path.
+            updateVerificationButtonState();
+        }
+
+        // Edit Details keeps everything and goes back to the form; Start Over
+        // keeps nothing. Neither happens on its own.
+        function outcomeAction(act) {
+            if (act === 'clear') {
+                startOver();
+            } else if (act === 'edit') {
+                hideOutcome();
+            } else if (act === 'retry') {
+                hideOutcome();
+                retryLastMethod();
+            }
+        }
+
+        // Consent was given for this person moments ago and this is the same
+        // attempt continuing, so a retry does not ask again. Start Over is
+        // what ends the sitting, and the next person is asked afresh.
+        function retryLastMethod() {
+            if (lastMethod === 'fingerprint') {
+                startFingerprintVerification();
+            } else if (heldLiveness) {
+                verifyWithHeldLiveness();
+            } else {
+                startVerification();
+            }
+        }
+
+        document.getElementById('outcome-primary').addEventListener('click', function() {
+            outcomeAction(this.getAttribute('data-act'));
+        });
+        document.getElementById('outcome-secondary').addEventListener('click', function() {
+            outcomeAction(this.getAttribute('data-act'));
+        });
+
+        // --- Fetch public key ---
+        (function() {
+            fetch(GET_PUBLIC_KEY_URL, {
+                method: 'POST',
+                headers: {'X-CSRFToken': csrfToken}
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                publicKeyInput.value = (data && data.public_key) || '';
+            })
+            .catch(function(err) {
+                console.warn('Public key fetch failed:', err.message);
+            });
+        })();
+
+        // --- Tabs ---
+        document.querySelectorAll('.tabs .tab-link').forEach(function(button) {
+            button.addEventListener('click', function() {
+                var targetId = this.getAttribute('data-tab');
+                var inputTabIds = ['qr-tab', 'pcn-tab', 'demographic-tab'];
+                if (inputTabIds.indexOf(targetId) >= 0) {
+                    activeTabId = targetId;
+                    updateVerificationButtonState();
+                }
+                this.closest('.tabs').querySelectorAll('.tab-link').forEach(function(l) { l.classList.remove('active'); });
+                this.classList.add('active');
+
+                var card = this.closest('.card');
+                inputTabIds.forEach(function(id) {
+                    var panel = card.querySelector('#' + id);
+                    if (panel) panel.style.display = (id === targetId) ? 'block' : 'none';
+                });
+            });
+        });
+
+        // --- Build payload from active tab ---
+        function buildPayload(sessionId) {
+            var payload = { face_liveness_session_id: sessionId || '' };
+            switch (activeTabId) {
+                case 'demographic-tab':
+                    payload.first_name = document.getElementById('first-name').value;
+                    payload.middle_name = document.getElementById('middle-name').value;
+                    payload.last_name = document.getElementById('last-name').value;
+                    payload.suffix = document.getElementById('suffix').value;
+                    payload.birth_date = mmddyyyyToIso(document.getElementById('birth-date').value);
+                    break;
+                case 'qr-tab':
+                    payload.value = qrCodeValue;
+                    break;
+                case 'pcn-tab':
+                    payload.value = pcnInput.value;
+                    break;
+            }
+            return payload;
+        }
+
+        function sendVerifyQuery(payload) {
+            var httpStatus = 0;
+            lastBiometric = payload.fingerprint ? 'fingerprint'
+                : payload.face_liveness_session_id ? 'face' : '';
+            // A verification, never a sign-in: if this page's session has
+            // ended, the server says so instead of signing in whoever is
+            // being verified (verify/views/everify.py).
+            payload.purpose = 'verify';
+            return fetch(QUERY_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify(payload)
+            })
+            .then(function(response) { httpStatus = response.status; return response.json(); })
+            .then(function(result) {
+                result = result || {};
+                if (result.signed_out) {
+                    releaseLiveness();
+                    window.location.href = '/';
+                    return;
+                }
+                // The server decides this: a success never carries a
+                // `verified` key, so there is no row to read it off.
+                var verified = result.status !== 'error';
+                if (verified && result.data && Array.isArray(result.data) && result.data.length > 0) {
+                    // The person has been verified and is leaving for the
+                    // document, so the face check has nothing left to do.
+                    releaseLiveness();
+                    // Nothing is handed back: the server kept eVerify's
+                    // answer when it gave it, and the document is made of
+                    // that alone.
+                    window.location.href = '/app/document/';
+                    return;
+                }
+                showOutcome(!verified ? 'unverified'
+                            : httpStatus === 404 ? 'nomatch'
+                            : 'incomplete',
+                            { message: result.message, status: httpStatus,
+                              trace: result.trace });
+            });
+        }
+
+        // --- Consent ---
+        var consentOverlay = document.getElementById('consent-overlay');
+        var consentAcceptBtn = document.getElementById('consent-accept-btn');
+        var consentDeclineBtn = document.getElementById('consent-decline-btn');
+        var consentResolve = null;
+
+        consentAcceptBtn.addEventListener('click', function() {
+            consentOverlay.classList.add('hidden');
+            if (consentResolve) consentResolve(true);
+        });
+        consentDeclineBtn.addEventListener('click', function() {
+            consentOverlay.classList.add('hidden');
+            if (consentResolve) consentResolve(false);
+        });
+
+        function requestConsent() {
+            return new Promise(function(resolve) {
+                consentResolve = resolve;
+                consentOverlay.classList.remove('hidden');
+            });
+        }
+
+        // --- Liveness & Verification ---
+        startVerificationBtn.addEventListener('click', function() {
+            requestConsent().then(function(accepted) {
+                if (!accepted) {
+                    showStatus(livenessStatus, 'Consent is required to proceed with verification.', true);
+                    return;
+                }
+                startVerification();
+            });
+        });
+
+        if (startFingerprintBtn) {
+            startFingerprintBtn.addEventListener('click', function() {
+                requestConsent().then(function(accepted) {
+                    if (!accepted) {
+                        showStatus(livenessStatus, 'Consent is required to proceed with verification.', true);
+                        return;
+                    }
+                    startFingerprintVerification();
+                });
+            });
+        }
+
+        function startFingerprintVerification() {
+            if (!FINGERPRINT_ENDPOINT) {
+                showStatus(livenessStatus, '<strong>Fingerprint endpoint not configured.</strong> Update it in Setup.', true);
+                return;
+            }
+            lastMethod = 'fingerprint';
+            lastBiometric = '';
+            startFingerprintBtn.disabled = true;
+            startVerificationBtn.disabled = true;
+            livenessStatus.innerHTML = '';
+            startFingerprintBtn.textContent = 'Scanning fingerprint\u2026';
+            showLivenessOverlay('Place finger on scanner…');
+
+            var capturePayload = {
+                env: 'Production',
+                purpose: 'Auth',
+                specVersion: '0.9.5',
+                timeout: 10000,
+                captureTime: new Date().toUTCString(),
+                domainUri: 'https://apps.pdccl.philsys.gov.ph',
+                transactionId: Date.now(),
+                bio: [{
+                    type: 'Finger',
+                    count: 1,
+                    bioSubType: ['UNKNOWN'],
+                    requestedScore: 40,
+                    deviceId: FINGERPRINT_SERIAL,
+                    deviceSubId: 0,
+                    previousHash: ''
+                }],
+                customOpts: null
+            };
+
+            fetch(FINGERPRINT_ENDPOINT, {
+                method: 'CAPTURE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(capturePayload)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                var bio = resp && resp.biometrics && resp.biometrics[0];
+                var err = (bio && bio.error) || {};
+                var code = String(err.errorCode || '');
+                var info = err.errorInfo || 'Unknown error';
+                if (code !== '0') {
+                    logLivenessFailure('Fingerprint capture failed: errorCode=' + code + ' (' + info + ')');
+                    showOutcome('incomplete',
+                                { message: 'The fingerprint reader returned an error: '
+                                           + info + ' (code ' + code + ').' });
+                    return;
+                }
+                showLivenessOverlay('Fingerprint captured. Verifying…');
+                startFingerprintBtn.textContent = 'Verifying…';
+                var payload = buildPayload('');
+                delete payload.face_liveness_session_id;
+                payload.fingerprint = resp;
+                return sendVerifyQuery(payload);
+            })
+            .catch(function(err) {
+                var detail = (err && err.message) ? err.message : String(err);
+                logLivenessFailure('Fingerprint capture error: ' + detail);
+                showOutcome('incomplete',
+                            { message: 'The fingerprint reader could not be reached ('
+                                       + detail + ').' });
+            })
+            .finally(function() {
+                hideLivenessOverlay();
+                startFingerprintBtn.textContent = 'Scan Fingerprint & Verify';
+                updateVerificationButtonState();
+            });
+        }
+
+        // Verify again on the strength of the face check already held: no
+        // camera, no second consent -- no new personal data is collected.
+        function verifyWithHeldLiveness() {
+            // Never silently. If the offer is stale the strip goes, so the
+            // operator sees why nothing happened.
+            if (!canReuseFaceCheck()) { renderHeldLiveness(); return; }
+            lastMethod = 'liveness';
+            startVerificationBtn.disabled = true;
+            showLivenessOverlay('Verifying identity\u2026');
+            sendVerifyQuery(buildPayload(heldLiveness.sessionId))
+                .catch(function(err) {
+                    showOutcome('incomplete', { message: transportMessage(err) });
+                })
+                .finally(function() {
+                    hideLivenessOverlay();
+                    updateVerificationButtonState();
+                });
+        }
+
+        verifyHeldBtn.addEventListener('click', verifyWithHeldLiveness);
+
+        function startVerification() {
+            lastMethod = 'liveness';
+            lastBiometric = '';
+            startVerificationBtn.disabled = true;
+            livenessStatus.innerHTML = '';
+
+            var hasLiveness = publicKeyInput.value.trim() && typeof window.eKYC === 'function';
+
+            if (hasLiveness) {
+                startVerificationBtn.textContent = 'Liveness check\u2026';
+                showLivenessOverlay('Liveness check in progress\u2026');
+
+                var sdkObserver = new MutationObserver(function() {
+                    var iframe = document.querySelector('iframe[src*="everify"], iframe[allow*="camera"]');
+                    if (iframe) {
+                        var iframeOverlay = iframe.parentElement;
+                        if (iframeOverlay) {
+                            // The SDK's own chrome is already a consistent
+                            // full screen (overlay inset 0, iframe border 0
+                            // flex-filling it), so its geometry is left
+                            // alone: forcing 100vw/100vh/15vh over it reads
+                            // as a partial border on the current build.
+                            // Same rule as login.html's copy, including
+                            // '×', the current build's label for its close
+                            // button.
+                            var closeBtn = iframeOverlay.querySelector('span, button, div');
+                            if (closeBtn && ['X', '×', 'Cancel'].indexOf(closeBtn.textContent.trim()) >= 0) {
+                                closeBtn.style.position = 'fixed';
+                                closeBtn.style.top = '0.5rem';
+                                closeBtn.style.right = '5vw';
+                                closeBtn.style.background = '#dc2626';
+                                closeBtn.style.color = '#fff';
+                                closeBtn.style.padding = '0.4rem 1rem';
+                                closeBtn.style.borderRadius = '6px';
+                                closeBtn.style.fontSize = '0.9rem';
+                                closeBtn.style.fontWeight = '600';
+                                closeBtn.style.cursor = 'pointer';
+                                closeBtn.style.zIndex = '2147483647';
+                                closeBtn.textContent = 'Cancel';
+                            }
+                        }
+                        sdkObserver.disconnect();
+                        var pollCount = 0;
+                        var poll = setInterval(function() {
+                            pollCount++;
+                            try {
+                                var rect = iframe.getBoundingClientRect();
+                                if (rect.width > 0 && rect.height > 0 && pollCount >= 5) {
+                                    clearInterval(poll);
+                                    hideLivenessOverlay();
+                                }
+                            } catch(e) {}
+                            if (pollCount >= 16) {
+                                clearInterval(poll);
+                                hideLivenessOverlay();
+                            }
+                        }, 500);
+                    }
+                });
+                sdkObserver.observe(document.body, { childList: true, subtree: true });
+
+                window.eKYC().start({ pubKey: publicKeyInput.value })
+                    .then(function(data) {
+                        if (data && data.status === 'COMPLETED') {
+                            showLivenessOverlay('Liveness confirmed. Verifying identity\u2026');
+                            var sessionId = data.result.session_id;
+                            // The capture itself is deliberately not shown. A
+                            // success prints it on the document; a failure has
+                            // no reason to leave a face on a screen the next
+                            // person in the queue walks up to.
+                            holdLiveness(sessionId);
+                            startVerificationBtn.textContent = 'Verifying\u2026';
+                            return sendVerifyQuery(buildPayload(sessionId))
+                                .catch(function(err) {
+                                    showOutcome('incomplete',
+                                                { message: transportMessage(err) });
+                                });
+                        } else {
+                            hideLivenessOverlay();
+                            throw new Error('Liveness check finished with status: ' + (data ? data.status : 'UNKNOWN'));
+                        }
+                    })
+                    .catch(function(err) {
+                        hideLivenessOverlay();
+                        var status = (err && err.status) || '';
+                        if (status === 'CANCELLED' || status === 'CANCELED' ||
+                            (typeof err === 'object' && !err.message)) {
+                            logLivenessFailure('User cancelled liveness check');
+                            showOutcome('incomplete',
+                                        { message: 'The face check was cancelled '
+                                                   + 'before it finished.' });
+                        } else {
+                            var detail = err.message || JSON.stringify(err);
+                            logLivenessFailure('Liveness SDK error: ' + detail);
+                            showOutcome('incomplete', { message: detail });
+                        }
+                    })
+                    .finally(function() {
+                        hideLivenessOverlay();
+                        releaseCamera();
+                        startVerificationBtn.textContent = 'Start Face Camera & Verify';
+                        updateVerificationButtonState();
+                    });
+            } else {
+                // No liveness SDK — skip to direct verification
+                lastMethod = 'direct';
+                startVerificationBtn.textContent = 'Verifying...';
+                sendVerifyQuery(buildPayload(''))
+                    .catch(function(err) {
+                        showOutcome('incomplete', { message: transportMessage(err) });
+                    })
+                    .finally(function() {
+                        startVerificationBtn.textContent = 'Start Face Camera & Verify';
+                        updateVerificationButtonState();
+                    });
+            }
+        }
+
+        // --- QR Scanning (with server-side OpenCV fallback) ---
+        function stopQrScanner() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(function(t) { t.stop(); });
+                videoStream = null;
+            }
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            qrScannerContainer.style.display = 'none';
+            startQrScanBtn.disabled = false;
+            startQrScanBtn.textContent = 'Start Camera Scan';
+        }
+
+        function extractIdFromQrPayload(data) {
+            var s = data.trim();
+            // Try strict ID patterns (3-letter digital ID or 16-digit card number)
+            var stripped = s.replace(/[-\s]/g, '');
+            if (/^[A-Za-z]{3}\d{3,4}$/.test(s)) return s.toUpperCase();
+            if (/^\d{16}$/.test(stripped)) return stripped;
+            // Try National ID JSON payload: the Digital National ID's back
+            // carries id/pcn at the top, the PhilID card's back nests the
+            // card number under subject.PCN, printed with dashes. Without
+            // this branch the card's whole JSON would fall through to
+            // the raw fallback below and go to eVerify as the value --
+            // and on a failure, into the transaction's digital-ID
+            // column, name and birth date included.
+            try {
+                var parsed = JSON.parse(s);
+                if (parsed.id) return String(parsed.id);
+                if (parsed.pcn) return String(parsed.pcn);
+                if (parsed.subject && parsed.subject.PCN) {
+                    return String(parsed.subject.PCN).replace(/[-\s]/g, '');
+                }
+            } catch(e) {}
+            // Accept any non-empty alphanumeric string
+            if (stripped.length > 0 && /^[A-Za-z0-9]+$/.test(stripped)) return stripped;
+            return null;
+        }
+
+        function handleQrDecoded(rawData) {
+            var id = extractIdFromQrPayload(rawData);
+            if (id) {
+                qrCodeValue = id;
+                // Echoed masked (bullets, last character kept): the scanned
+                // ID must not be readable off the status line while the
+                // field beside it is masked. showStatus writes innerHTML,
+                // which is one more reason the raw scan does not go in.
+                showStatus(qrStatusEl, '<strong>QR Code Found!</strong> ID: ' + Verify.maskId(id), false);
+            } else {
+                // Store raw data as fallback — let eVerify decide
+                qrCodeValue = rawData.trim();
+                showStatus(qrStatusEl, '<strong>QR Code Found!</strong> Data is ready for verification.', false);
+            }
+            stopQrScanner();
+            updateVerificationButtonState();
+        }
+
+        function serverDecodeQrFile(fileOrBlob) {
+            var formData = new FormData();
+            formData.append('qr_image', fileOrBlob, fileOrBlob.name || 'capture.png');
+            showStatus(qrStatusEl, 'Processing with server...');
+            fetch('/decode-qr/', { method: 'POST', body: formData })
+                .then(function(r) { return r.json(); })
+                .then(function(resp) {
+                    if (resp.status === 'ok' && resp.data) {
+                        var id = resp.data.id_number || resp.data.pcn || '';
+                        if (id) {
+                            qrCodeValue = id;
+                            showStatus(qrStatusEl, '<strong>QR Code Found!</strong> Data is ready for verification.', false);
+                            stopQrScanner();
+                            updateVerificationButtonState();
+                        } else {
+                            logLivenessFailure('QR decoded but no ID found in payload');
+                            showStatus(qrStatusEl, '<strong>QR decoded but no ID found.</strong>', true);
+                        }
+                    } else {
+                        logLivenessFailure('QR detection failed: ' + (resp.message || 'Could not decode QR'));
+                        showStatus(qrStatusEl, resp.message || '<strong>Could not decode QR.</strong>', true);
+                    }
+                })
+                .catch(function() {
+                    logLivenessFailure('QR processing network error');
+                    showStatus(qrStatusEl, '<strong>Network error</strong> processing QR image.', true);
+                });
+        }
+
+        function captureFrameToServer() {
+            if (!qrVideo || !qrVideo.videoWidth) return;
+            qrCanvasElement.width = qrVideo.videoWidth;
+            qrCanvasElement.height = qrVideo.videoHeight;
+            qrCanvas.drawImage(qrVideo, 0, 0);
+            qrCanvasElement.toBlob(function(blob) {
+                if (blob) serverDecodeQrFile(blob);
+            }, 'image/png');
+        }
+
+        var jsQrFailCount = 0;
+        var serverPending = false;
+
+        function processFrame() {
+            if (qrVideo.readyState !== qrVideo.HAVE_ENOUGH_DATA) return false;
+            qrCanvasElement.height = qrVideo.videoHeight;
+            qrCanvasElement.width = qrVideo.videoWidth;
+            qrCanvas.drawImage(qrVideo, 0, 0, qrCanvasElement.width, qrCanvasElement.height);
+            var imageData = qrCanvas.getImageData(0, 0, qrCanvasElement.width, qrCanvasElement.height);
+            var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+            if (code) {
+                jsQrFailCount = 0;
+                handleQrDecoded(code.data);
+                return true;
+            }
+            // Auto server fallback every ~3 seconds
+            jsQrFailCount++;
+            if (jsQrFailCount % 10 === 0 && !serverPending) {
+                serverPending = true;
+                captureFrameToServer();
+                setTimeout(function() { serverPending = false; }, 3000);
+            }
+            return false;
+        }
+
+        function tick() {
+            if (videoStream) {
+                if (!processFrame()) {
+                    animationFrameId = requestAnimationFrame(tick);
+                }
+            }
+        }
+
+        scanFrameBtn.addEventListener('click', function() {
+            if (!processFrame()) {
+                captureFrameToServer();
+            }
+        });
+
+        startQrScanBtn.addEventListener('click', function() {
+            qrCodeValue = null;
+            jsQrFailCount = 0;
+            updateVerificationButtonState();
+            startQrScanBtn.disabled = true;
+            startQrScanBtn.textContent = 'Requesting Camera...';
+            qrStatusEl.innerHTML = '';
+
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+                .then(function(stream) {
+                    videoStream = stream;
+                    qrVideo.srcObject = stream;
+                    qrScannerContainer.style.display = 'block';
+                    qrVideo.play();
+                    startQrScanBtn.textContent = 'Scanning...';
+                    animationFrameId = requestAnimationFrame(tick);
+                })
+                .catch(function(err) {
+                    showStatus(qrStatusEl, '<strong>Camera Error:</strong> ' + err.message, true);
+                    stopQrScanner();
+                });
+        });
+
+        qrFileInput.addEventListener('change', function(event) {
+            var file = event.target.files[0];
+            if (!file) return;
+            stopQrScanner();
+            qrCodeValue = null;
+            updateVerificationButtonState();
+            showStatus(qrStatusEl, 'Processing image...');
+
+            // Keep file ref before clearing
+            var fileRef = file;
+            event.target.value = null;
+
+            // Try client-side jsQR first
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var image = new Image();
+                image.onload = function() {
+                    qrCanvasElement.width = image.width;
+                    qrCanvasElement.height = image.height;
+                    qrCanvas.drawImage(image, 0, 0, image.width, image.height);
+                    var imageData = qrCanvas.getImageData(0, 0, image.width, image.height);
+                    var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+                    if (code) {
+                        handleQrDecoded(code.data);
+                    } else {
+                        // Fallback to server-side OpenCV
+                        serverDecodeQrFile(fileRef);
+                    }
+                };
+                image.onerror = function() {
+                    showStatus(qrStatusEl, '<strong>Error:</strong> Could not load the selected file as an image.', true);
+                };
+                image.src = e.target.result;
+            };
+            reader.readAsDataURL(fileRef);
+        });
+
+        document.getElementById('birth-date').addEventListener('input', function(e) {
+            var digits = e.target.value.replace(/\D/g, '').slice(0, 8);
+            var out = digits.slice(0, 2);
+            if (digits.length >= 3) out += '/' + digits.slice(2, 4);
+            if (digits.length >= 5) out += '/' + digits.slice(4, 8);
+            e.target.value = out;
+        });
+        demographicForm.addEventListener('input', updateVerificationButtonState);
+        pcnInput.addEventListener('input', function() {
+            this.value = this.value.toUpperCase();
+            updateVerificationButtonState();
+        });
+        // Show ID reveals the masked field; pressing it again masks it
+        // back. The flip lives in Verify.idMaskToggle, shared with the
+        // login page so the two controls cannot drift.
+        Verify.idMaskToggle(pcnInput, document.getElementById('toggle-id-btn'));
+        // Same rule as the login page's hint: shown only at a zoom that
+        // draws lines around the liveness camera. See verify.js.
+        Verify.livenessZoomHint(document.getElementById('zoom-hint'));
+        updateVerificationButtonState();
+    })();
+});
+</script>
+{% endblock %}

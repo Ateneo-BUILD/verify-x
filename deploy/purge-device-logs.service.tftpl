@@ -1,0 +1,27 @@
+# systemd unit for the phones' activity log retention.
+# deploy/install-purge-timer.sh renders it, as gunicorn's own user and group,
+# into /etc/systemd/system/purge-device-logs.service on every deploy, and
+# purge-device-logs.timer.tftpl runs it daily. How long the log is kept is
+# DEVICE_LOG_RETENTION_DAYS in the site's settings, 360 days unless set.
+#
+# Only while gunicorn runs: whatever stops gunicorn to copy or replace the
+# database -- a backup, a restore, --sync-db -- stops a purge with
+# it (PartOf) and keeps one from starting meanwhile (Requisite).
+[Unit]
+Description=Age out the phones' activity log (manage.py purge_device_logs)
+After=network.target gunicorn.service
+Requisite=gunicorn.service
+PartOf=gunicorn.service
+
+[Service]
+Type=oneshot
+User=${app_user}
+Group=${app_group}
+WorkingDirectory=${app_dir}/verify
+EnvironmentFile=${app_dir}/.env
+ExecStart=${app_dir}/venv/bin/python manage.py purge_device_logs
+Nice=10
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=full

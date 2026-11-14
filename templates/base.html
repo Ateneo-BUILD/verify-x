@@ -1,0 +1,537 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ site_title }}: National ID{% endblock %}</title>
+    <style>
+        :root {
+            --primary-color: #00529B;
+            --secondary-color: #00386a;
+            --background-color: #f4f7f9;
+            --card-background: #ffffff;
+            --text-color: #333;
+            --border-color: #e0e0e0;
+            --success-color: #28a745;
+            --error-color: #dc3545;
+            --disabled-color: #ccc;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; }
+
+        /* The `hidden` attribute has to win.
+
+           The UA stylesheet hides it with `[hidden] { display: none }`, which
+           any class selector setting `display` outranks -- so an element with
+           `display: flex` on its class stays on screen however often the
+           script sets `.hidden = true`, while the script hiding it looks
+           correct throughout.
+
+           Assert what RENDERS, not what the property says. */
+        [hidden] { display: none !important; }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 1.25rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* Header (used by app page) */
+        .site-header {
+            width: 100%;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 0.8rem;
+            margin-bottom: 1rem;
+        }
+        .site-header .brand {
+            margin-right: auto;
+            font-size: 1.1rem; font-weight: 700;
+            color: var(--primary-color); text-decoration: none;
+        }
+        .site-header .brand:hover { color: var(--secondary-color); }
+        .site-header nav { display: flex; gap: 0.5rem; }
+
+        /* Layout.
+
+           A signed-in page takes the whole window, with no upper limit: the
+           old 800 px column left more than half of a 1,920 px screen empty.
+           What keeps that from stretching a form across the screen is
+           .page-cols below, not a cap.
+
+           A page that is ONE short task -- signing in, choosing where you
+           work, validating a document -- has nothing to fill a wide window
+           with, and keeps the centred 800 px column it always had. */
+        main { width: 100%; flex: 1; }
+
+        .container {
+            width: 100%;
+        }
+        .container.container--narrow { max-width: 800px; }
+
+        /* A page's cards in two columns once the window is wide enough: the
+           work in a wide main column, exports and settings in a side column.
+
+           Below the breakpoint the two simply stack, so a narrow window reads
+           exactly as it did. Each column is placed by name rather than by
+           where it falls in the markup, so a page can keep its cards in the
+           order a narrow window should show them -- side first, if that is
+           what it always showed -- and still put the main column on the
+           left. Screen only: paper never gets a second column. */
+        .page-main, .page-side { min-width: 0; }
+        @media screen and (min-width: 1100px) {
+            .page-cols {
+                display: grid;
+                grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+                column-gap: 1.25rem;
+                align-items: start;
+            }
+            .page-cols.page-cols--even {
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                column-gap: 2.5rem;
+            }
+            .page-cols > .page-main { grid-column: 1; grid-row: 1; }
+            .page-cols > .page-side { grid-column: 2; grid-row: 1; }
+        }
+
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+            font-size: 1.4rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Card */
+        .card {
+            background-color: var(--card-background);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 1rem;
+            color: var(--secondary-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Typography */
+        .page-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.15rem; color: var(--text-color); }
+        .page-subtitle { font-size: 0.9rem; color: #666; margin-bottom: 1rem; }
+
+        /* Forms */
+        .form-group { margin-bottom: 0.85rem; }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.35rem;
+        }
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 0.6rem 0.75rem;
+            border: 1.5px solid #999;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 0.95rem;
+        }
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(0, 82, 155, 0.15);
+        }
+        input::placeholder { color: #999; }
+        select { cursor: pointer; }
+
+        /* A National ID input masked like a password, with the reveal the
+           operator's own choice (Verify.idMaskToggle). The toggle sits
+           inside the field, so it must shed the card's full-width blue
+           button styling -- hence the extra specificity. */
+        .masked-id { position: relative; }
+        .masked-id input { padding-right: 5.5rem; }
+        .card .masked-id button {
+            position: absolute;
+            top: 50%;
+            right: 0.4rem;
+            transform: translateY(-50%);
+            width: auto;
+            margin: 0;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.8rem;
+            background: none;
+            color: var(--primary-color);
+        }
+        .card .masked-id button:hover {
+            background: rgba(0, 82, 155, 0.08);
+            color: var(--primary-color);
+        }
+
+        /* Shown under a camera button only when the current browser zoom
+           will draw lines around the liveness camera (Verify.livenessZoomHint). */
+        .zoom-hint {
+            margin: 0.45rem 0 0;
+            font-size: 0.8rem;
+            color: #5c6672;   /* 5.8:1 on white */
+            text-align: center;
+        }
+
+        /* Buttons */
+        .container button, .card button, .modal-box button, .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.65rem 1.25rem;
+            border-radius: 4px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            width: 100%;
+            margin-top: 0.35rem;
+        }
+        .container button:hover, .card button:hover, .modal-box button:hover, .btn:hover {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        .container button:disabled, .card button:disabled, .modal-box button:disabled, .btn:disabled {
+            background-color: var(--disabled-color);
+            cursor: not-allowed;
+        }
+        .btn-secondary, .modal-box button.btn-secondary, .container button.btn-secondary, .card button.btn-secondary { background-color: #6c757d; }
+        .btn-secondary:hover, .modal-box button.btn-secondary:hover, .container button.btn-secondary:hover, .card button.btn-secondary:hover { background-color: #5a6268; }
+        .btn-sm { padding: 0.5rem 1rem; font-size: 0.9rem; width: auto; margin-top: 0; }
+
+        /* Info box */
+        .info-box {
+            background-color: #eef;
+            border-left: 4px solid var(--primary-color);
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.85rem;
+            font-size: 0.9rem;
+        }
+
+        /* Status / result messages */
+        .status-box, .result-box {
+            margin-top: 0.75rem;
+            padding: 0.65rem 0.85rem;
+            border-radius: 4px;
+            word-wrap: break-word;
+            font-size: 0.85rem;
+        }
+        .result-box { display: none; }
+        .status-box.success, .result-box.success {
+            background-color: #e9f7ec;
+            color: var(--success-color);
+            border: 1px solid var(--success-color);
+        }
+        .status-box.error, .result-box.error {
+            background-color: #fdecea;
+            color: var(--error-color);
+            border: 1px solid var(--error-color);
+        }
+
+        /* Branding header */
+        .branding-header {
+            text-align: center;
+            margin-bottom: 0.75rem;
+        }
+        .branding-header img {
+            max-height: 60px;
+            width: auto;
+        }
+
+        /* Branding footer */
+        .branding-footer {
+            text-align: center;
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+            width: 100%;
+        }
+        .branding-footer .developer-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #999;
+            margin-bottom: 0.4rem;
+        }
+        .branding-footer .logo-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1.5rem;
+        }
+        .branding-footer .logo-container img {
+            max-height: 55px;
+            width: auto;
+        }
+
+        /* Organization banner — the operating organization's identity, shown
+           on every signed-in page. Falls back to initials on a colour when no
+           logo is uploaded, so an organization never renders a broken image. */
+        .org-banner {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: var(--card-background);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            padding: 0.6rem 0.9rem;
+            margin-bottom: 0.75rem;
+        }
+        .org-banner img.org-logo {
+            max-height: 40px; max-width: 150px;
+            width: auto; border-radius: 4px; display: block;
+        }
+        .org-mark {
+            width: 40px; height: 40px; border-radius: 6px; flex: 0 0 auto;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-weight: 700; font-size: 0.8rem;
+        }
+        .org-mark.lg { width: 64px; height: 64px; font-size: 1.1rem; border-radius: 8px; }
+        .org-banner .org-id { flex: 1; min-width: 0; }
+        .org-banner .org-name {
+            font-size: 1.05rem; font-weight: 700;
+            color: var(--secondary-color); line-height: 1.2;
+        }
+        .org-banner .org-sub { font-size: 0.75rem; color: #666; margin-top: 0.1rem; }
+
+        /* Which location this session's transactions are logged against.
+           Only rendered when there is more than one possible answer. */
+        .context-strip {
+            display: flex; align-items: center; gap: 0.4rem;
+            font-size: 0.8rem; color: #555;
+            background: #eef;
+            border-left: 4px solid var(--primary-color);
+            padding: 0.5rem 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .context-strip b { color: var(--secondary-color); }
+        .context-strip a, .context-strip form { margin-left: auto; color: var(--primary-color); font-weight: 600; }
+
+        .role-badge {
+            display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px;
+            font-size: 0.75rem; font-weight: 600; white-space: nowrap;
+        }
+        .role-admin { background: #eef; color: var(--primary-color); }
+        .role-operator { background: #f0f0f0; color: #666; }
+        .role-site { background: var(--secondary-color); color: #fff; }
+        .role-ok { background: #e9f7ec; color: var(--success-color); }
+        .role-none { background: #fdecea; color: var(--error-color); }
+
+        /* Hint text */
+        .hint { color: #666; font-size: 0.8rem; margin-top: 0.25rem; }
+
+        /* Camera / QR container */
+        .camera-container {
+            display: none; position: relative;
+            margin-bottom: 0.5rem; border-radius: 4px;
+            overflow: hidden; background: #000;
+        }
+        .camera-container video { width: 100%; display: block; }
+        .camera-overlay {
+            position: absolute; bottom: 0.5rem; left: 0; right: 0;
+            text-align: center; font-size: 0.8rem; color: #fff;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        }
+        .camera-close { position: absolute; top: 0.5rem; right: 0.5rem; }
+
+        /* Divider */
+        .divider {
+            display: flex; align-items: center; gap: 0.75rem;
+            margin: 1rem 0 0.75rem;
+        }
+        .divider::before, .divider::after {
+            content: ""; flex: 1; height: 1px; background: var(--border-color);
+        }
+        .divider span { font-size: 0.8rem; color: #666; font-weight: 600; }
+
+        /* App navigation header */
+        .app-nav {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .app-nav .nav-links {
+            display: flex;
+            gap: 0.25rem;
+        }
+        .app-nav .nav-links a {
+            padding: 0.4rem 1rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-color);
+            text-decoration: none;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        .app-nav .nav-links a:hover {
+            background-color: #e8eef3;
+        }
+        .app-nav .nav-links a.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        .app-nav .nav-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+        .app-nav .user-name {
+            font-size: 0.85rem;
+            color: var(--secondary-color);
+            font-weight: 500;
+        }
+
+        /* Flex helpers */
+        .flex-row { display: flex; gap: 0.5rem; }
+        .flex-1 { flex: 1; }
+
+        /* Section label */
+        .section-label {
+            font-size: 0.75rem; font-weight: 600; color: #666;
+            text-transform: uppercase; letter-spacing: 0.04em;
+        }
+
+        /* Modal overlay */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000;
+        }
+        .modal-overlay.hidden { display: none; }
+        .modal-box {
+            background: var(--card-background);
+            padding: 1.5rem 2rem; border-radius: 8px;
+            max-width: 460px; width: 90%;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        .modal-box p {
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: #555;
+        }
+        .modal-box h2 { margin-top: 0; border-bottom: none; }
+        .modal-box h2.primary { color: var(--primary-color); }
+        .modal-box h2.error { color: var(--error-color); }
+        .consent-buttons { display: flex; gap: 1rem; margin-top: 1.5rem; }
+        .consent-buttons button {
+            flex: 1;
+            margin-top: 0;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+        }
+
+        /* Logout button (shared across pages) */
+        .container button.logout-btn {
+            background-color: #6c757d;
+            width: auto;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            margin-top: 0;
+        }
+        .container button.logout-btn:hover { background-color: #5a6268; }
+
+        /* Signing out and changing organization are POSTs with the CSRF
+           token, so their controls are small forms. .inline-form keeps one
+           in the line it sits in; .link-button makes its button read as a
+           link. */
+        .inline-form { display: inline; margin: 0; }
+        .container button.link-button, .link-button {
+            display: inline; width: auto; margin: 0; padding: 0;
+            background: none; border: none; border-radius: 0;
+            color: var(--primary-color); font: inherit; font-weight: 600;
+            cursor: pointer;
+        }
+        .container button.link-button:hover, .link-button:hover {
+            background: none; color: var(--secondary-color);
+            text-decoration: underline;
+        }
+
+        /* Spinner animation (shared across pages) */
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            body { padding: 0.75rem; }
+            .card { padding: 1rem 1.1rem; }
+            h1 { font-size: 1.2rem; }
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    {% block body %}
+    <header class="site-header">
+        <a href="{% url 'home' %}" class="brand">Verify</a>
+        {% block header_nav %}{% endblock %}
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    {% endblock %}
+    <script nonce="{{ csp_nonce }}">
+    // In place of inline event attributes, declared instead: the page's
+    // Content-Security-Policy refuses every one of them (verify/csp.py).
+    //   <form data-confirm="Question?">   asks before it submits
+    //   <button data-href="/path/">       goes there -- a path on this site only
+    //   <input or select data-autosubmit> submits its form when changed
+    document.addEventListener('submit', function (event) {
+        var question = event.target.getAttribute && event.target.getAttribute('data-confirm');
+        if (question && !window.confirm(question)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }
+    }, true);
+    document.addEventListener('click', function (event) {
+        var button = event.target.closest && event.target.closest('[data-href]');
+        var path = button && button.getAttribute('data-href');
+        // A path, never a URL: injected markup must not turn this into a way off the site.
+        if (path && path.charAt(0) === '/' && path.charAt(1) !== '/' && path.charAt(1) !== '\\') {
+            window.location.href = path;
+        }
+    });
+    document.addEventListener('change', function (event) {
+        var field = event.target;
+        if (field.matches && field.matches('[data-autosubmit]') && field.form) {
+            field.form.submit();
+        }
+    });
+    </script>
+</body>
+</html>

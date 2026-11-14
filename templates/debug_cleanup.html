@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}Debug captures{% endblock %}
+
+{% block extra_head %}
+<style>
+    .warn-plate {
+        background: #fff4f4; border: 1px solid #e0b4b4; border-left: 4px solid #b3261e;
+        border-radius: 4px; padding: 0.9rem 1.1rem; margin-bottom: 1.25rem;
+    }
+    .warn-plate h2 { margin: 0 0 0.4rem; font-size: 1rem; color: #8c1d18; }
+    .warn-plate p { margin: 0 0 0.5rem; font-size: 0.85rem; line-height: 1.5; }
+    .warn-plate p:last-child { margin-bottom: 0; }
+
+    .store-head { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-end;
+                  margin-bottom: 1.25rem; }
+    .store-stat { min-width: 7rem; }
+    .store-stat .n { font-size: 1.6rem; font-weight: 700; color: #00529B;
+                     font-variant-numeric: tabular-nums; line-height: 1.1; }
+    .store-stat .l { font-size: 0.7rem; text-transform: uppercase;
+                     letter-spacing: 0.08em; color: #6b7a89; }
+    .store-actions { margin-left: auto; display: flex; gap: 0.5rem; }
+
+    .size-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .size-table th {
+        text-align: left; font-size: 0.68rem; text-transform: uppercase;
+        letter-spacing: 0.06em; color: #6b7a89; font-weight: 700;
+        border-bottom: 1px solid var(--border-color); padding: 0.4rem 0.5rem;
+        white-space: nowrap;
+    }
+    .size-table td { padding: 0.4rem 0.5rem; border-bottom: 1px solid #eef1f4;
+                     font-variant-numeric: tabular-nums; }
+    .size-table tbody tr:hover { background: #f7fafc; }
+    .thumb { width: 34px; height: 34px; object-fit: cover; border-radius: 3px;
+             background: #eef1f4; display: block; }
+    .no-thumb { width: 34px; height: 34px; border-radius: 3px; background: #eef1f4;
+                display: block; }
+    .verdict-ok { color: #1b7f4b; font-weight: 700; }
+    .verdict-bad { color: #b3261e; font-weight: 700; }
+    .muted { color: #8b98a5; }
+    .row-links { white-space: nowrap; font-size: 0.74rem; }
+    .row-links a { margin-right: 0.5rem; }
+    /* A link, not a button. The two buttons above empty the whole store,
+       and a third of the same weight beside every row would read as one of
+       them. */
+    .container .row-drop { display: inline; margin: 0; }
+    .container .row-drop button {
+        width: auto; margin: 0; padding: 0; border: 0; background: none;
+        color: #b3261e; font-size: 0.74rem; text-decoration: underline;
+        cursor: pointer;
+    }
+    .container .row-drop button:hover { background: none; color: #8c1d18; }
+    .table-wrap { overflow-x: auto; }
+    .settings-line { font-size: 0.8rem; color: #6b7a89; margin: 0 0 1rem; }
+    .container button.btn-remove { background-color: #dc3545; }
+    .container button.btn-remove:hover { background-color: #b02a37; }
+    .purged-note { background: #eaf6ee; border: 1px solid #b6ddc4; border-radius: 4px;
+                   padding: 0.6rem 0.9rem; margin-bottom: 1rem; font-size: 0.85rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Debug captures</h1>
+
+<div class="warn-plate">
+    <h2>This is a development store of real identity records</h2>
+    <p>Every row below is a whole eVerify response &mdash; every field the
+    upstream returned, and the face fetched from it. It exists so the printed
+    document&rsquo;s sizing and quality can be measured against real data
+    rather than against a cartoon.</p>
+    <p>It is written only where both opt-ins are set, so it cannot come into
+    existence on production. <strong>Empty it as soon as a study is
+    finished.</strong> Nothing ages it out on a timer.</p>
+</div>
+
+{% if purged is not None %}
+<div class="purged-note">Purged {{ purged }} row{{ purged|pluralize }}.</div>
+{% endif %}
+
+<div class="store-head">
+    <div class="store-stat">
+        <div class="n">{{ total }}</div>
+        <div class="l">captures</div>
+    </div>
+    <div class="store-stat">
+        <div class="n">{{ with_photos }}</div>
+        <div class="l">with a face</div>
+    </div>
+    <div class="store-actions">
+        <form method="post" data-confirm="Delete every stored face? This cannot be undone.">
+            {% csrf_token %}
+            <input type="hidden" name="scope" value="photos">
+            <button type="submit" class="btn-secondary">Drop the faces</button>
+        </form>
+        <form method="post" data-confirm="Delete every captured response? This cannot be undone.">
+            {% csrf_token %}
+            <input type="hidden" name="scope" value="all">
+            <button type="submit" class="btn-remove">debug-cleanup</button>
+        </form>
+    </div>
+</div>
+
+<p class="settings-line">
+    Sizing below is against what this build ships:
+    credential stamp <strong>{{ stamp_mm }} mm</strong>,
+    portrait stamp <strong>{{ portrait_stamp_mm }} mm</strong>,
+    portrait rendered at <strong>{{ portrait_px }} px</strong>.
+    A row that does not fit is the signal to widen the stamp or lower the
+    resolution &mdash; never to print below 0.4 mm per module.
+</p>
+
+<div class="table-wrap">
+<table class="size-table">
+    <thead>
+        <tr>
+            <th>When</th>
+            <th>Purpose</th>
+            <th>Face</th>
+            <th>Keys</th>
+            <th colspan="4">Portrait symbol</th>
+            <th colspan="3">Credential symbol</th>
+            <th rowspan="2">Open</th>
+            <th rowspan="2"></th>
+        </tr>
+        <tr>
+            <th></th><th></th><th></th><th></th>
+            <th>bytes</th><th>version</th><th>mm/module</th><th>SSIM</th>
+            <th>chars</th><th>version</th><th>needs</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+        <tr>
+            <td class="muted">{{ row.capture.created_at|date:"m/d/Y H:i" }}</td>
+            <td>{{ row.capture.purpose }}</td>
+            <td>
+                {% if row.capture.has_photo and not demo_mode %}
+                    <img class="thumb" src="{{ row.capture.photo_data }}" alt="">
+                {% else %}
+                    <span class="no-thumb" title="{% if demo_mode %}hidden in Demo Mode{% endif %}"></span>
+                {% endif %}
+            </td>
+            <td>{{ row.capture.field_count }}</td>
+            {% if row.portrait %}
+                <td>{{ row.portrait.bytes|default_if_none:"&mdash;" }}</td>
+                <td>{% if row.portrait.version %}v{{ row.portrait.version }}{% else %}&mdash;{% endif %}</td>
+                <td>{% if row.portrait.module_mm %}{{ row.portrait.module_mm|floatformat:4 }}{% else %}&mdash;{% endif %}</td>
+                <td class="{% if row.portrait.scannable %}verdict-ok{% else %}verdict-bad{% endif %}">
+                    {% if row.portrait.ssim %}{{ row.portrait.ssim|floatformat:3 }}{% else %}no fit{% endif %}
+                </td>
+            {% else %}
+                <td colspan="4" class="muted">no face</td>
+            {% endif %}
+            {% if row.credential %}
+                <td>{{ row.credential.chars }}</td>
+                <td>{% if row.credential.version %}v{{ row.credential.version }}{% else %}&mdash;{% endif %}</td>
+                <td class="{% if row.credential.scannable %}verdict-ok{% else %}verdict-bad{% endif %}">
+                    {% if row.credential.min_stamp_mm %}{{ row.credential.min_stamp_mm|floatformat:1 }} mm{% else %}too large{% endif %}
+                </td>
+            {% else %}
+                <td colspan="3" class="muted">not minted</td>
+            {% endif %}
+            {% comment %}
+            The sizing numbers say what this capture costs the two symbols;
+            these two open what it looks like -- the document that would be
+            printed of it, through this organization's field list, and the
+            validation page a checker would read back. Demo Mode masks what
+            they render, as it does everywhere; it never swaps the record.
+            The Face column is emptied under Demo Mode, as faces are.
+            {% endcomment %}
+            <td class="row-links">
+                <a href="{% url 'debug_sample' %}?capture={{ row.capture.id }}">document</a>
+                <a href="{% url 'debug_sample_validate' %}?capture={{ row.capture.id }}">validate</a>
+            </td>
+            <td>
+                <form method="post" class="row-drop"
+                      data-confirm="Delete this capture? This cannot be undone.">
+                    {% csrf_token %}
+                    <input type="hidden" name="scope" value="one">
+                    <input type="hidden" name="capture" value="{{ row.capture.id }}">
+                    <button type="submit">delete</button>
+                </form>
+            </td>
+        </tr>
+    {% empty %}
+        <tr><td colspan="13" class="muted">
+            Nothing captured yet. Run a verification on this instance.
+        </td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

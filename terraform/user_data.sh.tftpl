@@ -1,0 +1,67 @@
+#!/bin/bash
+# First-boot provisioning for a Verify app server. Terraform renders this
+# into the server's user data; it runs once, as root, on a stock Amazon
+# Linux 2023 image. It installs the packages, the virtualenv, gunicorn's unit
+# and nginx, and leaves the rest to the first `deploy/deploy.sh`, which
+# brings the code, the .env and the key files.
+#
+# No secret is written here, deliberately. User data is readable by anybody
+# allowed to describe the instance.
+set -euxo pipefail
+exec > >(tee /var/log/user_data.log) 2>&1
+
+APP_USER="${app_user}"
+APP_DIR="${app_dir}"
+
+# --- System packages ---
+dnf update -y
+dnf install -y python3.11 python3.11-pip python3.11-devel nginx gcc rsync
+
+# --- Application directory and virtualenv. The first deploy installs
+# --- requirements.txt into it, gunicorn included. ---
+mkdir -p "$APP_DIR"
+python3.11 -m venv "$APP_DIR/venv"
+"$APP_DIR/venv/bin/pip" install --upgrade pip
+
+# deploy.sh starts gunicorn, and creates the first superuser when the
+# settings carry DJANGO_SUPERUSER_PASSWORD, on the deploy that finds this.
+touch "$APP_DIR/.first_deploy"
+
+# --- gunicorn: deploy/gunicorn.conf.py and deploy/gunicorn.service.tftpl ---
+mkdir -p /var/log/gunicorn
+
+cat > "$APP_DIR/gunicorn.conf.py" <<'VERIFY_GUNICORN_CONF'
+${gunicorn_conf}
+VERIFY_GUNICORN_CONF
+
+cat > /etc/systemd/system/gunicorn.service <<'VERIFY_GUNICORN_SERVICE'
+${gunicorn_service}
+VERIFY_GUNICORN_SERVICE
+
+# --- nginx: deploy/nginx.conf.tftpl ---
+cat > /etc/nginx/conf.d/verify.conf <<'VERIFY_NGINX_CONF'
+${nginx_conf}
+VERIFY_NGINX_CONF
+
+# Amazon Linux keeps its stock `server { listen 80; server_name _; }` inside
+# /etc/nginx/nginx.conf, which includes conf.d/*.conf BEFORE it, so the file
+# above is the default server and nginx reports discarding the stock one as
+#
+#     nginx: [warn] conflicting server name "_" on 0.0.0.0:80, ignored
+#
+# which is nginx saying the configuration did what it was meant to. The line
+# below removes a sample block on distributions that ship it as a file.
+rm -f /etc/nginx/conf.d/default.conf
+
+# --- Ownership. nginx serves staticfiles/ from under the user's home, so the
+# --- home directory must be traversable. ---
+chown -R "$APP_USER:$APP_USER" "$APP_DIR" /var/log/gunicorn
+chmod 711 "$(dirname "$APP_DIR")"
+
+# --- Services. gunicorn is enabled but not started: it has no code and no
+# --- .env until the first deploy, which starts it. ---
+systemctl daemon-reload
+systemctl enable gunicorn
+systemctl enable --now nginx
+
+echo "=== Provisioning complete. Next: deploy/deploy.sh deploy ==="

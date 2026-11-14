@@ -1,0 +1,659 @@
+{% extends "base.html" %}
+{% load static %}
+{% load demo %}
+
+{% block title %}{{ site_title }}: Setup{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* An operator's Setup is two short sections -- Demo Mode and the
+       fingerprint reader -- which is one short task, so it keeps the
+       centred card it always had. A site admin's carries the site-wide
+       sections as well, and takes the window: their own settings on the
+       left, the site's on the right. */
+    .setup-card { max-width: 600px; margin: 0 auto; }
+    .setup-card.setup-card--wide { max-width: none; }
+    @media screen and (min-width: 1100px) {
+        .page-cols > .page-side > .setup-section:first-child {
+            border-top: none; margin-top: 0; padding-top: 0;
+        }
+    }
+    .setup-card .hint { margin-top: 0.25rem; }
+    .container button.btn-save {
+        width: auto;
+        padding: 0.65rem 1.5rem;
+        margin-top: 0.5rem;
+    }
+    .setup-section {
+        border-top: 1px solid var(--border-color);
+        margin-top: 1.5rem;
+        padding-top: 1.25rem;
+    }
+    .form-group select {
+        width: 100%;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        font-size: 0.95rem;
+        font-family: inherit;
+        background: #fff;
+        color: var(--text-color);
+    }
+    .setup-section--first {
+        border-top: none;
+        margin-top: 0;
+        padding-top: 0;
+    }
+    .setup-section h3 {
+        font-size: 0.95rem;
+        color: var(--secondary-color);
+        margin: 0 0 0.85rem;
+    }
+    .toggle-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+    .toggle-row .toggle-label { font-weight: 600; }
+    .switch { position: relative; flex: 0 0 auto; width: 46px; height: 26px; cursor: pointer; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .slider {
+        position: absolute;
+        inset: 0;
+        background-color: #c3ccd4;
+        border-radius: 26px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    .switch .slider::before {
+        content: "";
+        position: absolute;
+        height: 20px;
+        width: 20px;
+        left: 3px;
+        top: 3px;
+        background-color: #fff;
+        border-radius: 50%;
+        transition: transform 0.2s;
+    }
+    .switch input:checked + .slider { background-color: var(--primary-color); }
+    .switch input:checked + .slider::before { transform: translateX(20px); }
+    .switch input:focus-visible + .slider { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+
+    /* The development capture store. Its own card, not a section of the form
+       above: the purge buttons are forms of their own, and a form inside a
+       form is not a thing HTML has. */
+    .store-card { margin: 1.5rem 0 0; }
+    .store-warn {
+        background: #fff4f4; border: 1px solid #e0b4b4;
+        border-left: 4px solid #b3261e; border-radius: 4px;
+        padding: 0.8rem 1rem; margin-bottom: 1.1rem; font-size: 0.85rem;
+        line-height: 1.5;
+    }
+    .store-warn strong { color: #8c1d18; }
+    .store-head { display: flex; gap: 1.4rem; flex-wrap: wrap;
+                  align-items: flex-end; margin-bottom: 1.1rem; }
+    .store-stat { min-width: 5.5rem; }
+    .store-stat .n { font-size: 1.5rem; font-weight: 700; color: #00529B;
+                     font-variant-numeric: tabular-nums; line-height: 1.1; }
+    .store-stat .l { font-size: 0.68rem; text-transform: uppercase;
+                     letter-spacing: 0.08em; color: #6b7a89; }
+    .store-actions { margin-left: auto; display: flex; gap: 0.5rem;
+                     align-items: flex-end; }
+    .store-actions form { margin: 0; }
+    .container .store-actions button {
+        width: auto; margin: 0; padding: 0.5rem 0.9rem; font-size: 0.85rem;
+    }
+    .container .store-actions button.btn-remove { background-color: #dc3545; }
+    .container .store-actions button.btn-remove:hover { background-color: #b02a37; }
+    .store-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .store-table th {
+        text-align: left; font-size: 0.66rem; text-transform: uppercase;
+        letter-spacing: 0.06em; color: #6b7a89; font-weight: 700;
+        border-bottom: 1px solid var(--border-color); padding: 0.4rem 0.5rem;
+        white-space: nowrap;
+    }
+    .store-table td { padding: 0.4rem 0.5rem; border-bottom: 1px solid #eef1f4;
+                      vertical-align: middle; }
+    .store-thumb { width: 30px; height: 30px; object-fit: cover;
+                   border-radius: 3px; background: #eef1f4; display: block; }
+    .store-none { width: 30px; height: 30px; border-radius: 3px;
+                  background: #eef1f4; display: block; }
+    .outcome-ok { color: #1b7f4b; font-weight: 700; }
+    .outcome-bad { color: #b3261e; font-weight: 700; }
+    .store-muted { color: #8b98a5; }
+    .store-scroll { overflow-x: auto; }
+    .store-detail { max-width: 22rem; overflow-wrap: anywhere; }
+    .store-links { white-space: nowrap; font-size: 0.72rem; }
+    .store-links a { margin-right: 0.5rem; }
+    /* A row's own delete is a link, not a button: the two buttons above
+       empty the whole store and a third one the same size beside every row
+       would read as one of those. */
+    .container .store-drop { display: inline; margin: 0; }
+    .container .store-drop button {
+        width: auto; margin: 0; padding: 0; border: 0; background: none;
+        color: #b3261e; font-size: 0.72rem; text-decoration: underline;
+        cursor: pointer;
+    }
+    .container .store-drop button:hover { background: none; color: #8c1d18; }
+
+    /* Phones that read holders' details: one row per person, the grant's
+       record beside them and a Withdraw that is a form of its own. */
+    #restricted-tier { margin: 1.5rem 0 0; }
+    .tier-people summary { cursor: pointer; font-weight: 600; font-size: 0.85rem;
+                           margin-bottom: 0.5rem; }
+    .tier-people ul { list-style: none; margin: 0; padding: 0; }
+    .tier-people li {
+        display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+        padding: 0.45rem 0; border-bottom: 1px solid #eef1f4; font-size: 0.85rem;
+    }
+    .tier-people .who { flex: 1; min-width: 12rem; font-weight: 600; }
+    .tier-people .ids { font-weight: 400; font-size: 0.75rem; color: #666; }
+    .tier-people .granted { font-size: 0.75rem; color: #6b7a89; }
+    .tier-people .none { color: #8b98a5; }
+    .tier-people form { margin: 0; }
+    .container .tier-people button.btn-withdraw {
+        width: auto; margin: 0; padding: 0.25rem 0.6rem; font-size: 0.75rem;
+        background-color: #dc3545;
+    }
+    .container .tier-people button.btn-withdraw:hover { background-color: #b02a37; }
+</style>
+{% endblock %}
+
+{% block body %}
+{# An operator's Setup is a one-task page and is centred like one; see .setup-card. #}
+<div class="container{% if not is_site_admin %} container--narrow{% endif %}">
+    {% include "includes/app_nav.html" with active_nav="setup" %}
+    {% include "includes/org_banner.html" %}
+
+    <div class="card setup-card{% if is_site_admin %} setup-card--wide{% endif %}">
+        <h2>Setup</h2>
+
+        {% if demo_mode %}
+        <div class="info-box" style="margin-bottom:1rem;">
+            <strong>Demo Mode is on.</strong> URLs, client IDs and the reader
+            serial below are redacted on screen, and those fields cannot be
+            edited while it is. Turn Demo Mode off to change them &mdash; the
+            stored values are untouched.
+        </div>
+        {% endif %}
+
+        {% if message %}
+        <div class="status-box success">{{ message }}</div>
+        {% endif %}
+        {% if error %}
+        <div class="status-box error">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="{% url 'setup' %}" autocomplete="off">
+            {% csrf_token %}
+
+            {% comment %}
+            Columns only for a site admin: an operator has nothing to put
+            in the second one, and an empty column would halve their card.
+            {% endcomment %}
+            <div{% if is_site_admin %} class="page-cols page-cols--even"{% endif %}>
+            <div class="page-main">
+            <div class="setup-section setup-section--first">
+                <h3>User Settings</h3>
+
+                <div class="toggle-row">
+                    <div>
+                        <label class="toggle-label" for="demo_mode">Demo Mode</label>
+                        <div class="hint">
+                            Masks the verification result on screen so a real ID can be shown
+                            to an audience: the photo is blurred, the given name and addresses
+                            show only their first word, the middle name, date and place of
+                            birth, blood type and marital status are redacted, and the ID
+                            numbers show only their last digit. The transaction still logs
+                            the real verification.
+                        </div>
+                    </div>
+                    <!-- A label, not a span: the slider covers the checkbox, so without
+                         the label wrapping it a click on the switch reaches nothing. -->
+                    <label class="switch">
+                        <input type="checkbox" id="demo_mode" name="demo_mode"
+                               {% if settings.demo_mode %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setup-section">
+                <h3>Fingerprint Authentication</h3>
+
+                {% if fingerprint %}
+                <div class="hint" style="margin-bottom:0.85rem;">
+                    The reader attached to the workstation you use at
+                    <strong>{{ current_org.name }}</strong>. If you also work at another
+                    organization, its reader is set separately &mdash; switch there and
+                    come back to this page.
+                </div>
+
+                <div class="form-group">
+                    <label for="fingerprint_auth_endpoint">Fingerprint Auth WebAPI Endpoint</label>
+                    <input
+                        type="url"
+                        id="fingerprint_auth_endpoint"
+                        name="fingerprint_auth_endpoint"
+                        value="{{ fingerprint.auth_endpoint|demo_url:demo_mode }}"
+                        {% if demo_mode %}readonly{% endif %}
+                        placeholder="https://example.com/api/fingerprint"
+                        maxlength="500">
+                    <div class="hint">Full URL including scheme (http:// or https://).</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="serial_number">Serial Number</label>
+                    <input
+                        type="text"
+                        id="serial_number"
+                        name="serial_number"
+                        value="{{ fingerprint.serial_number|demo_id:demo_mode }}"
+                        {% if demo_mode %}readonly{% endif %}
+                        maxlength="20">
+                    <div class="hint">
+                        Up to 20 characters. Leave it as <code>0</code> when there is no
+                        reader &mdash; the Verify page only offers the fingerprint button
+                        once a serial number is set.
+                    </div>
+                </div>
+                {% else %}
+                <div class="info-box" style="margin-bottom:0;">
+                    A fingerprint reader belongs to an operator at one organization.
+                    Choose an organization first and this section will appear.
+                </div>
+                {% endif %}
+            </div>
+            </div>{# /.page-main #}
+
+            {% if is_site_admin %}
+            <div class="page-side">
+            <div class="setup-section">
+                <h3>Site Administration</h3>
+                <div class="hint" style="margin-bottom:0.85rem;">
+                    Applies to every organization on this site, not just yours.
+                    Organizations themselves are managed under
+                    <a href="{% url 'site_admin' %}">Site</a>.
+                </div>
+
+                <div class="form-group">
+                    <label for="credential_validity_days">Credential validity (days)</label>
+                    <input type="number" id="credential_validity_days"
+                           name="credential_validity_days" required step="1" min="1"
+                           max="{{ credential_validity_ceiling }}"
+                           value="{{ site.credential_validity_days }}">
+                    <div class="hint">
+                        How long a new document&rsquo;s cut-out card and a holder&rsquo;s
+                        credential stay valid, from 1 to {{ credential_validity_ceiling }}
+                        days. The date prints on the card, and cards already issued keep
+                        theirs. Phones keep the keys to read a card until it expires, so a
+                        longer validity puts more keys on every phone for longer, and a
+                        lost phone can open more old cards.
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="login_mode">Login method</label>
+                    <select id="login_mode" name="login_mode">
+                        {% for value, label in login_modes %}
+                        <option value="{{ value }}"
+                            {% if site.login_mode == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="hint">
+                        Only the selected method appears on the login page. Single
+                        sign-on cannot be selected until its issuer, client ID and
+                        client secret are all set.
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="sso_issuer">SSO Issuer</label>
+                    <input type="url" id="sso_issuer" name="sso_issuer"
+                           value="{{ site.sso_issuer|demo_url:demo_mode }}"
+                           {% if demo_mode %}readonly{% endif %}
+                           placeholder="https://id.example.org/oidc" maxlength="255">
+                    <div class="hint">Your OpenID Connect provider's issuer URL, https
+                        only. It must return the National ID claims <code>pcn</code> and
+                        <code>digital_id</code>.
+                        {% if sso_allowed_issuers %}
+                        This server allows:
+                        {% for allowed_issuer in sso_allowed_issuers %}<code>{{ allowed_issuer|demo_url:demo_mode }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}.
+                        {% else %}
+                        This server allows no provider yet: its operator names the ones it
+                        may use in <code>SSO_ALLOWED_ISSUERS</code>.
+                        {% endif %}
+                    </div>
+                    {% if site.sso_issuer_refused %}
+                    <div class="hint" style="color:#b3261e;">
+                        The stored issuer is not one this server allows, so sign-in uses
+                        eVerify until it is changed or the server allows it.
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label for="sso_client_id">SSO Client ID</label>
+                    <input type="text" id="sso_client_id" name="sso_client_id"
+                           value="{{ site.sso_client_id|demo_id:demo_mode }}" maxlength="255"
+                           {% if demo_mode %}readonly{% endif %}
+                           autocomplete="off">
+                    <div class="hint">
+                        Issued when this site is registered on the provider, against
+                        the redirect URI <code>{{ request.scheme }}://{{ request.get_host|demo_id:demo_mode }}{% url 'sso_callback' %}</code>.
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="sso_client_secret">SSO Client Secret</label>
+                    <input type="password" id="sso_client_secret" name="sso_client_secret"
+                           value="" maxlength="255" autocomplete="new-password"
+                           placeholder="{% if site.sso_client_secret %}Stored - leave blank to keep{% else %}Not set{% endif %}">
+                    <div class="hint">
+                        Status:
+                        {% if site.sso_client_secret %}
+                            <strong>set</strong>. It is never shown again after saving;
+                            leave this blank to keep it, or type a new one to replace it.
+                            <label style="font-weight:400;">
+                                <input type="checkbox" name="sso_clear_secret" value="1"
+                                       style="width:auto; margin-right:0.35rem;">Clear the stored secret
+                            </label>
+                        {% else %}
+                            <strong>not set</strong>. The provider shows the secret once at
+                            creation; paste it here.
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="setup-section">
+                <h3>Sign-in eVerify client</h3>
+                <div class="hint" style="margin-bottom:0.85rem;">
+                    The eVerify client used to <strong>sign operators in</strong>. It has to be
+                    site-level: the login page runs before anyone has a session, so there is
+                    no organization yet whose client could be used. What a verification runs
+                    against is set per organization instead, and there is no fallback between
+                    the two.
+                </div>
+
+                <div class="form-group">
+                    <label for="everify_base_url">Base URL</label>
+                    <input type="url" id="everify_base_url" name="everify_base_url"
+                           value="{{ site.everify_base_url|demo_url:demo_mode }}" maxlength="255"
+                           {% if demo_mode %}readonly{% endif %}
+                           placeholder="https://ws.everify.gov.ph/api">
+                </div>
+
+                <div class="form-group">
+                    <label for="everify_client_id">Client ID</label>
+                    <input type="text" id="everify_client_id" name="everify_client_id"
+                           value="{{ site.everify_client_id|demo_id:demo_mode }}" maxlength="255"
+                           {% if demo_mode %}readonly{% endif %} autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="everify_client_secret">Client Secret</label>
+                    <input type="password" id="everify_client_secret" name="everify_client_secret"
+                           value="" maxlength="255" autocomplete="new-password"
+                           placeholder="{% if site.everify_client_secret %}Stored - leave blank to keep{% else %}Not set{% endif %}">
+                    <div class="hint">
+                        Status:
+                        {% if site.everify_client_secret %}
+                            <strong>set</strong>. Never shown again after saving; leave blank to
+                            keep it, or type a new one to replace it.
+                            <label style="font-weight:400;">
+                                <input type="checkbox" name="everify_clear_secret" value="1"
+                                       style="width:auto; margin-right:0.35rem;">Clear the stored secret
+                            </label>
+                        {% else %}
+                            <strong>not set</strong>. Until it is, sign-in falls back to the
+                            EVERIFY_* values in the instance environment.
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="everify_public_api_key">Public API Key</label>
+                    <input type="password" id="everify_public_api_key" name="everify_public_api_key"
+                           value="" autocomplete="new-password"
+                           placeholder="{% if site.everify_public_api_key %}Stored - leave blank to keep{% else %}Not set{% endif %}">
+                    <div class="hint">
+                        Used by the liveness SDK on the login page.
+                        {% if site.everify_public_api_key %}
+                        <label style="font-weight:400;">
+                            <input type="checkbox" name="everify_clear_public_key" value="1"
+                                   style="width:auto; margin-right:0.35rem;">Clear the stored key
+                        </label>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            </div>{# /.page-side #}
+            {% endif %}
+            </div>{# /.page-cols #}
+
+            <div style="text-align:right;">
+                <button type="submit" class="btn-save">Save</button>
+            </div>
+        </form>
+    </div>
+
+    {% if signing %}{% include "includes/signing_setup.html" %}{% endif %}
+
+    {% if is_site_admin %}
+    {% comment %}
+    Everybody whose phones read the restricted tier. Epoch keys are site-wide,
+    so that is every organization's documents: a site administrator's to grant
+    and this is where it can be seen whole.
+    {% endcomment %}
+    <div class="card" id="restricted-tier">
+        <h2>Phones that read holders&rsquo; details</h2>
+        <div class="hint" style="margin-bottom:0.75rem;">
+            These people&rsquo;s paired phones read the holder&rsquo;s name, birth date
+            and ID numbers from <em>every</em> organization&rsquo;s documents. The rest
+            confirm a document is genuine. A site administrator grants it on the
+            person&rsquo;s row on an organization&rsquo;s <a href="{% url 'site_admin' %}">Site</a>
+            page; people an organization admin adds start without it. Withdrawing
+            reaches their phones at the next sync.
+        </div>
+        <details class="tier-people" {% if restricted_people|length <= 10 %}open{% endif %}>
+            <summary>{{ restricted_people|length }} {% if restricted_people|length == 1 %}person{% else %}people{% endif %}</summary>
+            <ul>
+                {% for p in restricted_people %}
+                <li>
+                    <span class="who">{{ p.display_name|demo_name:demo_mode }}
+                        <span class="ids">&middot; {{ p.national_id_formatted|demo_id:demo_mode }}</span></span>
+                    <span class="granted">{% if p.restricted_tier_granted_at %}Granted {{ p.restricted_tier_granted_at|date:"M j, Y" }}{% if p.restricted_tier_granted_by %} by {{ p.restricted_tier_granted_by.display_name|demo_name:demo_mode }}{% endif %}{% else %}Granted before grants were recorded{% endif %}</span>
+                    <form method="post" action="{% url 'site_restricted_tier' p.id %}"
+                          data-confirm="Make this person’s phones confirm documents only?">
+                        {% csrf_token %}
+                        <input type="hidden" name="grant" value="0">
+                        <button type="submit" class="btn-withdraw">Withdraw</button>
+                    </form>
+                </li>
+                {% empty %}
+                <li class="none">Nobody. Every paired phone confirms documents only.</li>
+                {% endfor %}
+            </ul>
+        </details>
+    </div>
+    {% endif %}
+
+    {% if debug_store_open and is_site_admin %}
+    {% comment %}
+    Only where BOTH environment opt-ins are set, and only for a site admin. On
+    production this block does not render because the store cannot exist
+    there; the same two checks 404 /debug-cleanup/ and /debug-sample/, and the
+    checks there are what actually hold -- this one only decides whether the
+    buttons are drawn.
+    {% endcomment %}
+    <div class="card store-card">
+        <h2>Development capture store</h2>
+
+        <div class="store-warn">
+            <strong>This instance keeps what eVerify returned.</strong>
+            A successful lookup is stored whole &mdash; every field, and the
+            face &mdash; so the printed document&rsquo;s sizing can be measured
+            against real data rather than against a cartoon. A failed one is
+            stored too, with what the upstream said and no identity in it at
+            all. It exists only where both environment opt-ins are set, so it
+            cannot come into being on production.
+            <strong>Empty it when a study is finished</strong> &mdash; nothing
+            ages it out on a timer.
+        </div>
+
+        <div class="toggle-row" style="margin-bottom:1.1rem;">
+            <div>
+                <label class="toggle-label" for="debug_capture_enabled">Keep eVerify responses</label>
+                <div class="hint">
+                    Pauses and resumes the store. It cannot switch one on where
+                    the environment has not already allowed it &mdash; that
+                    gate stays in the instance <code>.env</code> and this is a
+                    pause button behind it. What is already stored is untouched
+                    either way.
+                </div>
+            </div>
+            {% comment %}
+            display:flex, and it is load-bearing. `.switch` is a <label>,
+            which is inline by default; in the Demo Mode row above it gets
+            its width because a flex item is blockified. Inside a plain
+            <form> it does not, so the slider positions against a
+            zero-width box and hangs off the edge of the card.
+            {% endcomment %}
+            <form method="post" action="{% url 'debug_cleanup' %}"
+                  style="margin:0; display:flex; flex:0 0 auto;">
+                {% csrf_token %}
+                <input type="hidden" name="scope" value="switch">
+                <input type="hidden" name="next" value="setup">
+                <label class="switch">
+                    <input type="checkbox" id="debug_capture_enabled" name="enabled"
+                           {% if capture_enabled %}checked{% endif %}
+                           data-autosubmit>
+                    <span class="slider"></span>
+                </label>
+            </form>
+        </div>
+
+        <div class="store-head">
+            <div class="store-stat">
+                <div class="n">{{ total }}</div>
+                <div class="l">captures</div>
+            </div>
+            <div class="store-stat">
+                <div class="n">{{ successes }}</div>
+                <div class="l">success</div>
+            </div>
+            <div class="store-stat">
+                <div class="n">{{ failures }}</div>
+                <div class="l">failure</div>
+            </div>
+            <div class="store-stat">
+                <div class="n">{{ with_photos }}</div>
+                <div class="l">with a face</div>
+            </div>
+            <div class="store-actions">
+                <form method="post" action="{% url 'debug_cleanup' %}"
+                      data-confirm="Delete every stored face? This cannot be undone.">
+                    {% csrf_token %}
+                    <input type="hidden" name="scope" value="photos">
+                    <input type="hidden" name="next" value="setup">
+                    <button type="submit" class="btn-secondary">Drop the faces</button>
+                </form>
+                <form method="post" action="{% url 'debug_cleanup' %}"
+                      data-confirm="Delete every captured response? This cannot be undone.">
+                    {% csrf_token %}
+                    <input type="hidden" name="scope" value="all">
+                    <input type="hidden" name="next" value="setup">
+                    <button type="submit" class="btn-remove">debug-cleanup</button>
+                </form>
+            </div>
+        </div>
+
+        <p class="hint" style="margin-bottom:1rem;">
+            <a href="{% url 'debug_cleanup' %}">Sizing report</a> &mdash; what
+            each capture does to the two symbols the card prints.
+            &nbsp;|&nbsp;
+            <a href="{% url 'debug_sample' %}">Sample document</a> &mdash; a
+            synthetic person, drawn face and all, through this
+            organization&rsquo;s field list. Nobody real, and nothing stored.
+            &nbsp;|&nbsp;
+            <a href="{% url 'debug_sample_validate' %}">Sample validation page</a>
+            &mdash; the Validate page filled in, from a record that was never
+            logged and whose id resolves to nothing.
+        </p>
+
+        <div class="store-scroll">
+        <table class="store-table">
+            <thead>
+                <tr>
+                    <th>When</th>
+                    <th>Purpose</th>
+                    <th>Outcome</th>
+                    <th>Status</th>
+                    <th>Detail</th>
+                    <th>Keys</th>
+                    <th>Face</th>
+                    <th>Open</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for capture in captures %}
+                <tr>
+                    <td class="store-muted">{{ capture.created_at|date:"m/d/Y H:i" }}</td>
+                    <td>{{ capture.purpose }}</td>
+                    <td class="{% if capture.failed %}outcome-bad{% else %}outcome-ok{% endif %}">{{ capture.outcome }}</td>
+                    <td>{% if capture.status_code %}{{ capture.status_code }}{% else %}&mdash;{% endif %}</td>
+                    <td class="store-detail store-muted">{{ capture.detail|default:"&mdash;" }}</td>
+                    <td>{{ capture.field_count }}</td>
+                    <td>
+                        {% if capture.has_photo and not demo_mode %}
+                            <img class="store-thumb" src="{{ capture.photo_data }}" alt="">
+                        {% else %}
+                            <span class="store-none" title="{% if demo_mode %}hidden in Demo Mode{% endif %}"></span>
+                        {% endif %}
+                    </td>
+                    {% comment %}
+                    Both open this row's stored response rather than the
+                    synthetic person: the document is what would be printed
+                    of it, through THIS organization's field list, and the
+                    validation page is what a checker would read back. Under
+                    Demo Mode both mask what they render, as everywhere; the
+                    faces in the column beside them are hidden.
+                    {% endcomment %}
+                    <td class="store-links">
+                        {% if not capture.failed and capture.field_count %}
+                        <a href="{% url 'debug_sample' %}?capture={{ capture.id }}">document</a>
+                        <a href="{% url 'debug_sample_validate' %}?capture={{ capture.id }}">validate</a>
+                        {% else %}
+                        <span class="store-muted">&mdash;</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <form method="post" action="{% url 'debug_cleanup' %}"
+                              class="store-drop"
+                              data-confirm="Delete this capture? This cannot be undone.">
+                            {% csrf_token %}
+                            <input type="hidden" name="scope" value="one">
+                            <input type="hidden" name="next" value="setup">
+                            <input type="hidden" name="capture" value="{{ capture.id }}">
+                            <button type="submit">delete</button>
+                        </form>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="9" class="store-muted">
+                    Nothing captured yet. Run a verification on this instance.
+                </td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% include "includes/branding_footer.html" %}
+</div>
+{% endblock %}
