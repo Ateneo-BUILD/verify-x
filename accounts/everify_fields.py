@@ -12,20 +12,25 @@ A row in ``OrganizationFieldSetting`` overrides one entry for one
 organization; ``rows_for()`` merges those over the defaults below, so a key
 added here reaches every organization at once with no data migration.
 
-The first thirteen are the whitelist the app already had. They keep their
-place at the top, their order, their display text and their old
-display/log defaults. The other twenty-three follow, switched off and
-with no display text -- which is the "otherwise it will be the key name"
-rule doing its job, and is why enabling one shows ``present_barangay``
-until somebody types a better name. ``email``, ``mobile_number`` and
-``residency_status`` are the ones that came with names, because their keys
-read badly on a document.
+The named fields lead the list, in the order the document lays them out.
+WHAT IS ON BY DEFAULT IS THE MINIMUM: the holder's name, both ID numbers,
+the date of birth and the age worked out from it, the two addresses and the
+photograph are shown, and the same fields are logged (all but the
+photograph, which cannot be). Every other field starts switched off on
+both, the named ones included -- sex, place of birth, marital status, blood
+type -- so an organization prints and keeps more only when a site admin
+decides it should. The
+twenty-three after the named fields also have no display text -- which is
+the "otherwise it will be the key name" rule doing its job, and is why
+enabling one shows ``present_barangay`` until somebody types a better name.
+``email``, ``mobile_number`` and ``residency_status`` are given names here,
+because their keys read badly on a document.
 
 ONE entry is not a key the lookup returned: ``age``, under the portrait. It
 is worked out here from ``birth_date`` on the day of the verification (see
-``COMPUTED``), shown and logged by default, and left out of the signed
-credential -- an age stops being true on the holder's next birthday, and the
-credential already carries the date of birth it came from. It is still in
+``COMPUTED``), on by default with the date of birth, and left out of the
+signed credential -- an age stops being true on the holder's next birthday,
+and the credential already carries the date of birth it came from. It is in
 this list because this list is what a site admin can name, switch and move.
 
 ``verified`` is deliberately NOT here. A successful lookup does not carry it
@@ -51,8 +56,11 @@ COMPUTED = {"age": "birth_date"}
 DATE_FORMAT = "%m/%d/%Y"
 
 #: (key, display text, shown by default, logged by default).
-#: The thirteen the app already whitelisted, in the order the document has
-#: always laid them out, and the age under the portrait.
+#: The named fields, in the order the document lays them out, with the age
+#: under the portrait. On by default: the name, both ID numbers, the date
+#: of birth and the age worked out from it, the addresses and the
+#: photograph (shown, never logged). The rest are off until a site admin
+#: switches them on.
 _REFERENCE = (
     ("face_url",             "Face Photo",                 True,  False),
     ("age",                  "Age",                        True,  True),
@@ -61,13 +69,13 @@ _REFERENCE = (
     ("last_name",            "Last Name",                  True,  True),
     ("reference",            "National ID Card Number",    True,  True),
     ("code",                 "Digital National ID Number", True,  True),
-    ("gender",               "Sex",                        True,  True),
+    ("gender",               "Sex",                        False, False),
     ("birth_date",           "Date of Birth",              True,  True),
-    ("place_of_birth",       "Place of Birth",             True,  True),
-    ("marital_status",       "Marital Status",             True,  True),
-    ("full_address",         "Permanent Address",          True,  False),
-    ("present_full_address", "Present Address",            True,  False),
-    ("blood_type",           "Blood Type",                 True,  False),
+    ("place_of_birth",       "Place of Birth",             False, False),
+    ("marital_status",       "Marital Status",             False, False),
+    ("full_address",         "Permanent Address",          True,  True),
+    ("present_full_address", "Present Address",            True,  True),
+    ("blood_type",           "Blood Type",                 False, False),
 )
 
 #: Everything else the same response carried, alphabetically as it arrived.

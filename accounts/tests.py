@@ -3126,20 +3126,28 @@ class OrganizationFieldConfigTest(TestCase):
         "blood_type": "O+",
     }
 
-    #: The default header. The same columns the CSV has always had, but in
-    #: the DOCUMENT's order, because there is now one order and the document
-    #: is what a person reads. This is a deliberate change of shape: the
-    #: column names are unchanged, their positions are not. AGE is the one
-    #: column added since, logged by default and placed where the document
-    #: places it, under the portrait.
+    #: The default header, in the DOCUMENT's order: there is one order and
+    #: the document is what a person reads. By default the log keeps only
+    #: the minimum -- the name, both ID numbers, the date of birth and the
+    #: age, and the two addresses (the decision) -- so sex, place of
+    #: birth, marital status and blood type are columns only once a site
+    #: admin switches them on.
     DEFAULT_HEADER = [
         "TRANSACTION_ID", "ORGANIZATION", "OPERATOR_NATIONAL_ID_NUMBER",
         "OPERATOR_LOCATION", "ACTING_AS_SITE_ADMIN", "AGE",
         "GIVEN_NAME", "MIDDLE_NAME", "LAST_NAME", "NATIONAL_ID_CARD_NUMBER",
-        "DIGITAL_NATIONAL_ID_NUMBER", "SEX", "DATE_OF_BIRTH",
-        "PLACE_OF_BIRTH", "MARITAL_STATUS", "VERIFICATION_TIMESTAMP",
+        "DIGITAL_NATIONAL_ID_NUMBER", "DATE_OF_BIRTH", "PERMANENT_ADDRESS",
+        "PRESENT_ADDRESS", "VERIFICATION_TIMESTAMP",
         "AUTHENTICATION_RESULT", "TRANSACTION_TYPE",
     ]
+
+    #: What a verification shows when nobody has configured anything, and
+    #: what it logs (the photograph cannot be). Widening either is a
+    #: decision about what every new organization prints and keeps.
+    SHOWN_BY_DEFAULT = {"face_url", "age", "first_name", "middle_name",
+                        "last_name", "reference", "code", "birth_date",
+                        "full_address", "present_full_address"}
+    LOGGED_BY_DEFAULT = SHOWN_BY_DEFAULT - {"face_url"}
 
     #: Every key a Tier II lookup returns, as captured from a real one.
     CAPTURED = [
@@ -3228,36 +3236,37 @@ class OrganizationFieldConfigTest(TestCase):
         return {key: {"display": False, "log": False}
                 for key in everify_fields.FIELD_KEYS}
 
-    # -- the defaults change nothing --------------------------------------
+    # -- the defaults are the minimum -------------------------------------
 
-    def test_the_defaults_are_the_field_set_the_app_already_had(self):
-        """An organization that has configured nothing sees the old whitelist,
-        in the old order, under the old names -- with the age, worked out from
-        the date of birth, under the portrait."""
-        labels = [row["key"] for row in self._prepared(self.org)]
-        self.assertEqual(labels, [
+    def test_the_defaults_show_and_log_only_the_minimum(self):
+        """With nothing configured a verification shows the name, both ID
+        numbers, the date of birth and the age, the two addresses and the
+        photograph, and logs the same less the photograph. Everything else --
+        sex, place of birth, marital status, blood type and every other key
+        -- starts off on both."""
+        rows = everify_fields.default_rows()
+        self.assertEqual({r["key"] for r in rows if r["display"]},
+                         self.SHOWN_BY_DEFAULT)
+        self.assertEqual({r["key"] for r in rows if r["log"]},
+                         self.LOGGED_BY_DEFAULT)
+        # An organization that has configured nothing gets exactly those.
+        self.assertEqual([r["key"] for r in self._prepared(self.org)], [
             "Age", "Given Name", "Middle Name", "Last Name",
-            "National ID Card Number", "Digital National ID Number", "Sex",
-            "Date of Birth", "Place of Birth", "Marital Status",
-            "Permanent Address", "Present Address", "Blood Type"])
+            "National ID Card Number", "Digital National ID Number",
+            "Date of Birth", "Permanent Address", "Present Address"])
 
-    def test_the_default_export_has_the_same_columns_in_document_order(self):
-        """One order now, so the CSV follows the document. The column NAMES
-        are exactly what they were; their positions are not, and that is the
-        deliberate cost of collapsing two orders into one."""
+    def test_the_default_export_has_the_minimum_in_document_order(self):
+        """One order, so the CSV follows the document, and by default it
+        carries no column the defaults do not log."""
         self._log_transaction(self._prepared(self.org))
-        header = self._export()[0]
+        header, row = self._export()
         self.assertEqual(header, self.DEFAULT_HEADER)
-        self.assertEqual(sorted(header), sorted([
-            "TRANSACTION_ID", "ORGANIZATION", "OPERATOR_NATIONAL_ID_NUMBER",
-            "OPERATOR_LOCATION", "ACTING_AS_SITE_ADMIN",
-            "NATIONAL_ID_CARD_NUMBER", "DIGITAL_NATIONAL_ID_NUMBER",
-            "GIVEN_NAME", "MIDDLE_NAME", "LAST_NAME", "DATE_OF_BIRTH",
-            "PLACE_OF_BIRTH", "MARITAL_STATUS", "SEX",
-            "VERIFICATION_TIMESTAMP", "AUTHENTICATION_RESULT",
-            "TRANSACTION_TYPE", "AGE"]),
-            "the set of columns must not have changed beyond AGE, only their "
-            "order")
+        for column in ("SEX", "PLACE_OF_BIRTH", "MARITAL_STATUS", "BLOOD_TYPE"):
+            self.assertNotIn(column, header)
+        self.assertEqual(row[header.index("PRESENT_ADDRESS")], "456 Aurora Blvd")
+        txn = Transaction.objects.get()
+        self.assertEqual((txn.sex, txn.place_of_birth, txn.marital_status),
+                         ("", "", ""))
 
     def test_a_response_that_identifies_nobody_is_still_a_miss(self):
         """The captured response carries `token`, which is there whoever it
@@ -3280,9 +3289,9 @@ class OrganizationFieldConfigTest(TestCase):
         self.assertNotIn("age", self.CAPTURED)
         self.assertNotIn("verified", everify_fields.FIELD_KEYS)
 
-    def test_the_old_whitelist_leads_with_its_names_and_defaults(self):
-        """The whitelist is the reference: it says which keys start on top,
-        in what order, under what name, and switched which way."""
+    def test_the_named_fields_lead_with_their_names_and_defaults(self):
+        """The named fields are the reference: they say which keys start on
+        top, in what order, under what name, and switched which way."""
         rows = everify_fields.in_order(everify_fields.rows_for(self.org))
         self.assertEqual(everify_fields.KNOWN_COUNT, 14)
         self.assertEqual([r["key"] for r in rows[:14]], [
@@ -3290,10 +3299,14 @@ class OrganizationFieldConfigTest(TestCase):
             "reference", "code", "gender", "birth_date", "place_of_birth",
             "marital_status", "full_address", "present_full_address",
             "blood_type"])
-        self.assertTrue(all(r["display"] for r in rows[:14]))
+        for row in rows[:14]:
+            self.assertEqual(row["display"], row["key"] in self.SHOWN_BY_DEFAULT,
+                             row["key"])
+            self.assertEqual(row["log"], row["key"] in self.LOGGED_BY_DEFAULT,
+                             row["key"])
+            self.assertTrue(row["name"], row["key"])
         self.assertEqual(rows[2]["name"], "Given Name")
         self.assertEqual(rows[1]["name"], "Age")
-        self.assertTrue(rows[1]["log"])
 
         # Everything the app had never used starts off, and unnamed --
         # except the three whose keys read badly on a document.
@@ -3321,34 +3334,39 @@ class OrganizationFieldConfigTest(TestCase):
     # -- Display ----------------------------------------------------------
 
     def test_display_off_keeps_the_field_off_the_document(self):
-        self._configure(self.org, blood_type={"display": False, "log": True})
+        self._configure(self.org,
+                        present_full_address={"display": False, "log": True},
+                        place_of_birth={"display": True})
         session = self.client.session
         session[SESSION_KEY] = self.admin.id
         session[ORG_SESSION_KEY] = self.org.id
         verified_answer.keep(session, self.org, self._prepared(self.org))
         session.save()
         table = self._doc_table()
-        self.assertNotIn("Blood Type", table)
-        self.assertNotIn("O+", table)
+        self.assertNotIn("Present Address", table)
+        self.assertNotIn("456 Aurora Blvd", table)
         self.assertIn("Place of Birth", table)
+        self.assertIn("123 Katipunan Ave", table)
 
     def test_a_field_that_is_neither_shown_nor_logged_is_not_carried(self):
         """Not hidden downstream -- never taken from the response at all."""
-        self._configure(self.org, blood_type={"display": False, "log": False})
+        self._configure(self.org,
+                        present_full_address={"display": False, "log": False})
         keys = [row["field"] for row in self._prepared(self.org)]
-        self.assertNotIn("blood_type", keys)
-        self.assertIn("place_of_birth", keys)
+        self.assertNotIn("present_full_address", keys)
+        self.assertNotIn("blood_type", keys)          # off by default
+        self.assertIn("full_address", keys)
 
     # -- Log --------------------------------------------------------------
 
     def test_log_off_means_the_value_is_never_recorded(self):
         """Not merely left out of the CSV: absent from the row entirely, so
         it cannot be exported later by switching the toggle back on."""
-        self._configure(self.org, place_of_birth={"log": False})
+        self._configure(self.org, birth_date={"log": False})
         self._log_transaction(self._prepared(self.org))
         txn = Transaction.objects.get()
-        self.assertEqual(txn.place_of_birth, "")
-        self.assertNotIn("place_of_birth", txn.logged_fields)
+        self.assertEqual(txn.date_of_birth, "")
+        self.assertNotIn("birth_date", txn.logged_fields)
         self.assertEqual(txn.given_name, "Juan")
 
     def test_a_field_with_no_column_of_its_own_can_still_be_logged(self):
@@ -3391,7 +3409,8 @@ class OrganizationFieldConfigTest(TestCase):
     def test_one_order_drives_the_document_and_the_csv_together(self):
         """The whole point of a single list: move a row once and both the
         printed page and the exported columns follow."""
-        self._configure(self.org, gender={"position": 0})
+        self._configure(self.org,
+                        gender={"position": 0, "display": True, "log": True})
         self.assertEqual(self._prepared(self.org)[0]["key"], "Sex")
         self._log_transaction(self._prepared(self.org))
         header = self._export()[0]
@@ -3401,8 +3420,11 @@ class OrganizationFieldConfigTest(TestCase):
 
     # -- names ------------------------------------------------------------
 
+    #: Place of birth, switched on as a site admin would, and renamed.
+    BIRTHPLACE = {"name": "Birthplace", "display": True, "log": True}
+
     def test_renaming_a_field_renames_it_on_the_document_and_in_the_csv(self):
-        self._configure(self.org, place_of_birth={"name": "Birthplace"})
+        self._configure(self.org, place_of_birth=self.BIRTHPLACE)
         labels = [row["key"] for row in self._prepared(self.org)]
         self.assertIn("Birthplace", labels)
         self.assertNotIn("Place of Birth", labels)
@@ -3412,7 +3434,7 @@ class OrganizationFieldConfigTest(TestCase):
     def test_renaming_a_field_does_not_stop_it_being_logged(self):
         """What this design exists to prevent: matching the posted rows by the
         label printed on the document."""
-        self._configure(self.org, place_of_birth={"name": "Birthplace"},
+        self._configure(self.org, place_of_birth=self.BIRTHPLACE,
                         first_name={"name": "Pangalan"})
         self._log_transaction(self._prepared(self.org))
         txn = Transaction.objects.get()
@@ -3436,9 +3458,13 @@ class OrganizationFieldConfigTest(TestCase):
     # -- scope ------------------------------------------------------------
 
     def test_one_organizations_configuration_does_not_touch_another(self):
-        self._configure(self.org, blood_type={"display": False, "log": False})
+        self._configure(self.org, blood_type={"display": True, "log": True},
+                        full_address={"display": False, "log": False})
+        self.assertIn("blood_type",
+                      [row["field"] for row in self._prepared(self.org)])
         keys = [row["field"] for row in self._prepared(self.other)]
-        self.assertIn("blood_type", keys)
+        self.assertNotIn("blood_type", keys)
+        self.assertIn("full_address", keys)
 
     def test_the_login_path_ignores_every_organizations_configuration(self):
         """Sign-in runs before there is a session, so before there is an
@@ -3451,8 +3477,9 @@ class OrganizationFieldConfigTest(TestCase):
         carried = [row["field"] for row in rows]
         self.assertIn("reference", carried)
         self.assertIn("code", carried)
-        # Twelve from the response, and the age worked out from one of them.
-        self.assertEqual(len(carried), 13)
+        # The built-in defaults: the eight of the response's that are on, and
+        # the age worked out from one of them.
+        self.assertEqual(len(carried), 9)
 
     def test_a_signed_out_lookup_still_signs_the_operator_in(self):
         """The end-to-end version of the above, through the real view."""
@@ -3581,7 +3608,8 @@ class OrganizationFieldConfigTest(TestCase):
             {"blood_type"})
 
     def test_reset_restores_the_defaults(self):
-        self._configure(self.org, blood_type={"display": False, "log": False})
+        self._configure(self.org, blood_type={"display": True, "log": True},
+                        full_address={"display": False, "log": False})
         self._as(self.site_admin)
         self.client.post(
             "/app/site/organizations/%d/fields/" % self.org.id,
@@ -3589,8 +3617,9 @@ class OrganizationFieldConfigTest(TestCase):
             content_type="application/json")
         self.assertFalse(OrganizationFieldSetting.objects.filter(
             organization=self.org).exists())
-        self.assertIn("blood_type",
-                      [row["field"] for row in self._prepared(self.org)])
+        keys = [row["field"] for row in self._prepared(self.org)]
+        self.assertNotIn("blood_type", keys)
+        self.assertIn("full_address", keys)
 
     def test_the_page_lists_every_field_once_in_one_list(self):
         self._as(self.site_admin)
@@ -3651,7 +3680,7 @@ class AgeFieldTest(TestCase):
     verification, printed after the name and in the details with the day it
     holds for, and logged as it was that day -- but never in the signed
     credential or on the phone card, because it stops being true on the
-    holder's next birthday."""
+    holder's next birthday. On by default, with the date of birth."""
 
     #: Born 1990-01-15, so 36 on the day below.
     RESPONSE = OrganizationFieldConfigTest.RESPONSE
@@ -3675,6 +3704,15 @@ class AgeFieldTest(TestCase):
         session[SESSION_KEY] = (user or self.admin).id
         session[ORG_SESSION_KEY] = self.org.id
         session.save()
+
+    def test_the_age_is_on_by_default_with_the_date_of_birth(self):
+        """An organization that has configured nothing shows and logs it."""
+        self.assertFalse(OrganizationFieldSetting.objects.exists())
+        rows = self._prepared()
+        self.assertEqual(self._age(rows)["value"], "36")
+        self.assertIn("birth_date", [r["field"] for r in rows])
+        age = next(r for r in everify_fields.default_rows() if r["key"] == "age")
+        self.assertEqual((age["display"], age["log"]), (True, True))
 
     def _prepared(self, response=None):
         return _prepare_data_for_frontend(
@@ -3786,7 +3824,8 @@ class AgeFieldTest(TestCase):
     def test_an_organization_that_saved_before_the_age_gets_it_under_the_portrait(self):
         """Its stored positions count places in the list WITHOUT the age, so
         the age's default position would land it wherever that number now
-        falls. It goes after Face Photo instead, wherever that was moved."""
+        falls. It goes after Face Photo instead, wherever that was moved, and
+        takes the default switches, which are on."""
         before = [key for key in everify_fields.FIELD_KEYS if key != "age"]
         before.remove("first_name")
         before.insert(0, "first_name")          # Given Name moved above the face
@@ -9543,6 +9582,15 @@ class CredentialContentTest(TestCase):
         ("marital_status", "Marital Status", "Single"),
     ]
 
+    def _displaying(self):
+        """The field list of an organization that displays every row above:
+        sex and marital status are off by default and switched on here."""
+        rows = everify_fields.rows_for(None)
+        for row in rows:
+            if row["key"] in {k for k, _l, _v in self.ROWS}:
+                row["display"] = True
+        return rows
+
     def _claims(self, **kwargs):
         import datetime as dt
 
@@ -9555,7 +9603,7 @@ class CredentialContentTest(TestCase):
             organization=None, location_code="QC1",
             document_uuid="11111111-2222-3333-4444-555555555555",
             document_hash=b"0" * 32, issued_at=now, expires_at=now,
-            field_rows=everify_fields.rows_for(None))
+            field_rows=self._displaying())
         defaults.update(kwargs)
         return credentials.build_claims(rows, **defaults)
 
@@ -9624,13 +9672,21 @@ class CredentialContentTest(TestCase):
              ("Marital Status", "Single")])
 
     def test_a_field_the_organization_hides_is_not_carried(self):
-        rows = everify_fields.rows_for(None)
+        rows = self._displaying()
         for row in rows:
             if row["key"] == "marital_status":
                 row["display"] = False
         labels = [label for label, _ in self._fields(field_rows=rows)]
         self.assertNotIn("Marital Status", labels)
         self.assertIn("Sex", labels)
+
+    def test_by_default_the_credential_carries_only_the_minimum(self):
+        """With nothing configured, sex and marital status are not displayed,
+        so they are not signed into the credential either."""
+        self.assertEqual(
+            self._fields(field_rows=everify_fields.rows_for(None)),
+            [("Given Name", "JUAN"), ("Last Name", "DELA CRUZ"),
+             ("Date of Birth", "01/15/1990")])
 
     def test_the_face_is_never_in_the_credential(self):
         """It does not fit at any quality worth printing -- measured -- and it

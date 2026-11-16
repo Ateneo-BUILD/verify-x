@@ -53,8 +53,8 @@ relying on a detail.
 | Document | Formats |
 |---|---|
 | Operator's Manual | [PDF](docs/user-manual.pdf) · [HTML](docs/user-manual.html) |
-| Architecture (slides) | [PDF, A4](docs/decks/verify-architecture%20-%20v1.0%20-%20A4.pdf) · [PDF, Letter](docs/decks/verify-architecture%20-%20v1.0%20-%20Letter.pdf) |
-| Capabilities overview (slides) | [PDF, A4](docs/decks/verify-capabilities%20-%20v1.0%20-%20A4.pdf) · [PDF, Letter](docs/decks/verify-capabilities%20-%20v1.0%20-%20Letter.pdf) |
+| Architecture (slides) | [PDF, A4](docs/decks/verify-architecture%20-%20v1.3%20-%20A4.pdf) · [PDF, Letter](docs/decks/verify-architecture%20-%20v1.3%20-%20Letter.pdf) |
+| Capabilities overview (slides) | [PDF, A4](docs/decks/verify-capabilities%20-%20v1.1%20-%20A4.pdf) · [PDF, Letter](docs/decks/verify-capabilities%20-%20v1.1%20-%20Letter.pdf) |
 | Offline verification (slides) | [PDF, A4](docs/decks/verify-offline-verification%20-%20v1.0%20-%20A4.pdf) · [PDF, Letter](docs/decks/verify-offline-verification%20-%20v1.0%20-%20Letter.pdf) |
 | CL03 credential QR wire format (specification) | [PDF, A4](docs/cl03-spec%20-%20v1.1%20-%20A4.pdf) · [PDF, Letter](docs/cl03-spec%20-%20v1.1%20-%20Letter.pdf) |
 | Deploying on AWS | [Markdown](docs/deploy-aws.md) |
