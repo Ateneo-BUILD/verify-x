@@ -148,6 +148,15 @@ It refuses any push that carries a credential from your local `.env`, or
 from the site configuration file `VERIFY_SITE` names, or a private key
 block, and names the file without printing the value.
 
+## Contributing
+
+Questions, bug reports and proposals are welcome.
+[CONTRIBUTING.md](CONTRIBUTING.md) says how to send one, and how a change
+reaches this repository. A security flaw is reported privately, as
+[SECURITY.md](SECURITY.md) describes, and not in an issue. The
+[code of conduct](CODE_OF_CONDUCT.md) applies to everyone who takes part,
+and [CONTRIBUTORS.md](CONTRIBUTORS.md) names those who have contributed.
+
 ## License
 
 Copyright 2026 Ateneo de Manila University - Business Insights Laboratory for

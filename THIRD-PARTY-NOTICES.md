@@ -11,6 +11,7 @@ covered by it, or are covered only as stated.
 | Path | Component | License |
 |---|---|---|
 | `static/jsQR.min.js` | [jsQR](https://github.com/cozmo/jsQR) 1.4.0, as minified by jsDelivr. Copyright Cosmo Wolfe and contributors. | Apache License 2.0, the same text as [`LICENSE`](LICENSE) |
+| `CODE_OF_CONDUCT.md` | The [Contributor Covenant](https://www.contributor-covenant.org), version 2.1, with this project's contact for reports. | Creative Commons Attribution 4.0 International |
 
 ## From BUILD-TRL's OfflineVerifier project
 
